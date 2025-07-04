@@ -75,6 +75,46 @@ function createContextMenus() {
             contexts: ['page', 'selection']
         });
         
+        // Summarize Page
+        browser.contextMenus.create({
+            id: 'summarize-page',
+            parentId: 'ai-analysis',
+            title: 'Summarize this page',
+            contexts: ['page']
+        });
+
+        // Quick Summary
+        browser.contextMenus.create({
+            id: 'quick-summary',
+            parentId: 'ai-analysis',
+            title: 'Do a quick summary',
+            contexts: ['page', 'selection']
+        });
+
+        // Main Points
+        browser.contextMenus.create({
+            id: 'main-points',
+            parentId: 'ai-analysis',
+            title: 'What are the main points? (bullet points)',
+            contexts: ['page', 'selection']
+        });
+
+        // Explain Further
+        browser.contextMenus.create({
+            id: 'explain-further',
+            parentId: 'ai-analysis',
+            title: 'Explain this topic further, and give me background information',
+            contexts: ['page', 'selection']
+        });
+
+        // Ask Questions
+        browser.contextMenus.create({
+            id: 'ask-questions',
+            parentId: 'ai-analysis',
+            title: 'What questions should I ask about this?',
+            contexts: ['page', 'selection']
+        });
+        
         // Study questions
         browser.contextMenus.create({
             id: 'study-questions',

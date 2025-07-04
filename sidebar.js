@@ -705,10 +705,38 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     'Please analyze any charts, graphs, or visual data on this page';
                 break;
                 
+            case 'summarize-page':
+                prompt = 'Please summarize this page.';
+                break;
+
+            case 'quick-summary':
+                prompt = message.selectedText ? 
+                    `Please provide a quick summary of this selected text: "${message.selectedText}"` :
+                    'Please provide a quick summary of this page.';
+                break;
+
+            case 'main-points':
+                prompt = message.selectedText ? 
+                    `What are the main points of this selected text in bullet points: "${message.selectedText}"` :
+                    'What are the main points of this page in bullet points?';
+                break;
+
+            case 'explain-further':
+                prompt = message.selectedText ? 
+                    `Please explain this topic further and provide background information based on: "${message.selectedText}"` :
+                    'Please explain this topic further, and give me background information based on the page content.';
+                break;
+
+            case 'ask-questions':
+                prompt = message.selectedText ? 
+                    `What questions should I ask about this selected text: "${message.selectedText}"` :
+                    'What questions should I ask about this page content?';
+                break;
+                
             case 'study-questions':
                 prompt = message.selectedText ? 
-                    `Generate study questions and flashcards for this content: "${message.selectedText}"` :
-                    'Generate comprehensive study questions and flashcards for this page content';
+                    `Please generate study questions and flashcards based on this selected text: "${message.selectedText}"` :
+                    'Please generate study questions and flashcards based on this page content';
                 break;
         }
         

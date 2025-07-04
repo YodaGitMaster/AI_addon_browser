@@ -40,6 +40,7 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - **FIXED**: Header visibility - now fully visible with enhanced styling and shadow
 - **IMPLEMENTED**: Persistent window that stays open when clicking outside
 - **ENABLED**: Native window dragging and resizing capabilities
+- **ADDED**: New suggestion buttons to `sidebar.html` for various analysis and summarization queries
 
 ## Architecture Changes
 - **FROM**: Simple popup with one-time summarization
@@ -61,6 +62,7 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 3. **HEADER VISIBILITY**: Confirm status and page info are now visible
 4. **COPY FUNCTIONALITY**: Test copy buttons on messages
 5. **WINDOW MANAGEMENT**: Test opening/closing behavior
+6. **NEW SUGGESTION BUTTONS**: Verify the functionality of the newly added suggestion buttons and context menu items, and ensure they correctly trigger AI responses
 
 ## Testing Results ✅
 - Extension icon responsive to clicks
@@ -112,3 +114,5 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - **RESOLVED**: Limited space (sidebar provides more room)
 
 ## Updated: 2024-12-19 Major upgrade to sidebar chat interface completed 
+
+## Data Structures & Formats (schema.md) 
