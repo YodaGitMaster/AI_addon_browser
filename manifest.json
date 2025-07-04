@@ -5,7 +5,8 @@
     "description": "Summarize web pages using Ollama Gemma3 model",
     "permissions": [
         "activeTab",
-        "storage"
+        "storage",
+        "contextMenus"
     ],
     "host_permissions": [
         "http://localhost:11434/*"

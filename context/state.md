@@ -16,6 +16,10 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - [x] Fix 403 Forbidden CORS error
 
 ## Last Completed Action
+- **PUSHED**: Successfully pushed entire project to private GitHub repository (`https://github.com/YodaGitMaster/AI_addon_browser.git`)
+- **INITIALIZED**: Git repository force reinitialized, existing history cleared as requested
+- **COMMITTED**: Initial commit made for all project files in the new local repository
+- **CONFIGURED**: Remote `origin` added and local `main` branch linked to remote `main`
 - **UPDATED**: Increased max_tokens from 800 to 128,000 for longer AI responses
 - **FIXED**: Export functionality bug - data structure mismatch resolved
 - **ROOT CAUSE**: Export function expected {role, content} but chatHistory stores {user, ai, timestamp}
@@ -27,9 +31,8 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - **CREATED**: Export modal with preview and multiple export options
 - **FEATURES**: 
   - Markdown rendering for AI responses (headers, bold, italic, code, lists, links, blockquotes)
-  - Export chat as markdown with page metadata
-  - Copy to clipboard functionality
-  - Download as .md file with timestamp
+  - Copy to clipboard functionality for exported markdown
+  - Download as .md file with timestamp for exported markdown
   - Export modal with preview
   - Styled markdown elements for better readability
 - **PREVIOUS**: Page content extraction in standalone window - updated tab querying to work across browser windows

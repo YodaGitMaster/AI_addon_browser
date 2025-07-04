@@ -115,7 +115,9 @@ async function loadPageContext() {
                 currentPageContext = {
                     title: contentResponse.data.title,
                     url: contentResponse.data.url,
-                    content: contentResponse.data.textContent
+                    content: contentResponse.data.textContent,
+                    tables: contentResponse.data.tables || [],
+                    charts: contentResponse.data.charts || []
                 };
                 
                 // Update UI
@@ -123,6 +125,8 @@ async function loadPageContext() {
                 elements.pageUrl.textContent = currentPageContext.url;
                 
                 console.log('Page context loaded:', currentPageContext.title);
+                console.log('Tables found:', currentPageContext.tables.length);
+                console.log('Charts found:', currentPageContext.charts.length);
             } else {
                 throw new Error('Failed to extract page content');
             }
@@ -146,13 +150,17 @@ async function loadPageContext() {
                     currentPageContext = {
                         title: contentResponse.data.title,
                         url: contentResponse.data.url,
-                        content: contentResponse.data.textContent
+                        content: contentResponse.data.textContent,
+                        tables: contentResponse.data.tables || [],
+                        charts: contentResponse.data.charts || []
                     };
                     
                     elements.pageTitle.textContent = currentPageContext.title;
                     elements.pageUrl.textContent = currentPageContext.url;
                     
                     console.log('Page context loaded from recent tab:', currentPageContext.title);
+                    console.log('Tables found:', currentPageContext.tables.length);
+                    console.log('Charts found:', currentPageContext.charts.length);
                 } else {
                     throw new Error('Failed to extract content from any tab');
                 }
@@ -323,6 +331,42 @@ function createContextPrompt(userMessage) {
         prompt += `Page Title: ${currentPageContext.title}\n`;
         prompt += `Page URL: ${currentPageContext.url}\n`;
         prompt += `Page Content: ${currentPageContext.content.substring(0, 3000)}...\n\n`;
+        
+        // Add table information if available
+        if (currentPageContext.tables && currentPageContext.tables.length > 0) {
+            prompt += `Tables found on page (${currentPageContext.tables.length}):\n`;
+            currentPageContext.tables.forEach((table, index) => {
+                prompt += `Table ${table.id}: ${table.caption || 'No caption'}\n`;
+                if (table.headers.length > 0) {
+                    prompt += `  Headers: ${table.headers.join(', ')}\n`;
+                }
+                prompt += `  Rows: ${table.rows.length}\n`;
+                
+                // Include first few rows as sample data
+                if (table.rows.length > 0) {
+                    prompt += `  Sample data:\n`;
+                    table.rows.slice(0, 3).forEach(row => {
+                        prompt += `    ${row.join(' | ')}\n`;
+                    });
+                }
+                prompt += '\n';
+            });
+        }
+        
+        // Add chart information if available
+        if (currentPageContext.charts && currentPageContext.charts.length > 0) {
+            prompt += `Charts/Graphs found on page (${currentPageContext.charts.length}):\n`;
+            currentPageContext.charts.forEach((chart, index) => {
+                prompt += `Chart ${chart.id} (${chart.type}): ${chart.description || 'No description'}\n`;
+                if (chart.context) {
+                    prompt += `  Context: ${chart.context}\n`;
+                }
+                if (chart.textContent) {
+                    prompt += `  Content: ${chart.textContent.substring(0, 100)}...\n`;
+                }
+                prompt += '\n';
+            });
+        }
     }
     
     // Add recent chat history for context
@@ -336,7 +380,7 @@ function createContextPrompt(userMessage) {
     }
     
     prompt += `Current user question: ${userMessage}\n\n`;
-    prompt += `Please provide a helpful, accurate, and conversational response based on the page content and context. If the question is not related to the page content, you can still provide a helpful general response.`;
+    prompt += `Please provide a helpful, accurate, and conversational response based on the page content and context. If analyzing tables, provide clear insights about the data. If analyzing charts, describe what the visual elements might represent. If the question is not related to the page content, you can still provide a helpful general response.`;
     
     return prompt;
 }
@@ -623,6 +667,63 @@ function showExportModal(markdownContent) {
         document.body.removeChild(modal);
     });
 }
+
+// Handle messages from background script (context menu actions)
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'contextMenuAction') {
+        console.log('Context menu action received:', message.menuItemId);
+        
+        // Generate appropriate prompt based on context menu selection
+        let prompt = '';
+        
+        switch (message.menuItemId) {
+            case 'ai-chat':
+                prompt = message.selectedText ? 
+                    `Please explain this selected text: "${message.selectedText}"` :
+                    'Help me understand this page';
+                break;
+                
+            case 'fact-check':
+                prompt = message.selectedText ? 
+                    `Please fact-check this statement: "${message.selectedText}"` :
+                    'Please fact-check the main claims on this page';
+                break;
+                
+            case 'extract-tables':
+                prompt = 'Please extract and analyze all tables on this page. Format them clearly and explain what they show.';
+                break;
+                
+            case 'financial-analysis':
+                prompt = message.selectedText ? 
+                    `Please provide a quick financial analysis of this data: "${message.selectedText}"` :
+                    'Please provide a quick financial analysis of this page content';
+                break;
+                
+            case 'chart-analysis':
+                prompt = message.selectedText ? 
+                    `Please analyze this chart/graph data: "${message.selectedText}"` :
+                    'Please analyze any charts, graphs, or visual data on this page';
+                break;
+                
+            case 'study-questions':
+                prompt = message.selectedText ? 
+                    `Generate study questions and flashcards for this content: "${message.selectedText}"` :
+                    'Generate comprehensive study questions and flashcards for this page content';
+                break;
+        }
+        
+        // Set the prompt in the input field and send it
+        if (prompt) {
+            elements.messageInput.value = prompt;
+            handleInputChange(); // Update send button state
+            
+            // Auto-send the message after a short delay
+            setTimeout(() => {
+                handleSendMessage();
+            }, 500);
+        }
+    }
+});
 
 // Initialize the sidebar
 document.addEventListener('DOMContentLoaded', () => {
