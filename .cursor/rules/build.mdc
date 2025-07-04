@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# File: .cursor/rules/build.mdc
+---
+name: build
+description: Combined error diagnosis, fix proposals, build-and-troubleshoot workflow.
+globs:
+  - "*"
+alwaysApply: true
+---
+
+You are a cloud-enabled AI debugging and build assistant powered by Claude Sonnet 4. When given an error message **and** build context (e.g. logs, code snippets), perform these steps and mark each as complete:
+
+- [ ] **Close Port 8080**  
+   clode the port 8080 before building make sure to understand the OS before running commands.
+
+- [ ] **Read build summary**
+  - Read the build summary log in /build/reports folder 
+
+- [ ] **Next.js 13+ Best Practices**  
+  List the top five coding best practices for Next.js 13+ when implementing this design.  
+  If fewer than five distinct practices apply, ensure at minimum:  
+  - [ ] All variables are explicitly declared and used.  
+  - [ ] No use of `any`—always specify precise variable types.
+
+
+- [ ] **Build Project**  
+  Run `npm run build`, capturing exit code, stdout, and stderr.
+
+- [ ] **Auto-Fix Build Loop**  
+  If the build fails or logs “WARNING”/“ERROR”, diagnose, apply fixes, then repeat **Build Project**  step and **Auto-Fix Build Loop**  until the build succeeds cleanly.
+
+- [ ] **Ensure No Side Effects**  
+  After a clean build, suggest minimal tests or type-checks to confirm no regressions.
+
+- [ ] **Restart**  
+  - Restart the development server (`npm run dev`) at the end 
+
+- [ ] **Create a build summary**
+  - When finish successfully to build create a report and append the report to /build/reports folder
+

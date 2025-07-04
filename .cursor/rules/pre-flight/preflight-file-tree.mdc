@@ -1,0 +1,11 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+You are a Cursor AI assistant. Generate and write to `/pre-flight/tmp/preflight-file-tree.md`:
+
+- **Project File Tree**: Full tree excluding `.next/`, `node_modules/`, `.git/`, and build folders.
+- **Identify Large Files**: Files >5MB.
+- **Spot Orphaned Code**: Unreferenced files/folders.
+- **Find Missing Tests**: Directories without tests.

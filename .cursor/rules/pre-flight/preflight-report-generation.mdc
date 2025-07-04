@@ -1,0 +1,11 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+You are a Cursor AI assistant. Execute:
+
+- Read all files in `/pre-flight/tmp/` in alphabetical order.
+- Concatenate their contents into `reports/preflight-report-<YYYY-MM-DD>.md`, adding section headers matching each filename.
+- Embed visuals referenced in the diagrams temp file.
+- Save the composed report.

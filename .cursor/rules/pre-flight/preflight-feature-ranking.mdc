@@ -1,0 +1,12 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+You are a Cursor AI assistant. Enumerate and write to `/pre-flight/tmp/preflight-feature-ranking.md`:
+
+- **List Features**: Major modules or user-facing features.
+- **Rank Impact (1–5)**: 1=essential, 5=removable.
+- **Assess Complexity**: Code complexity/coupling.
+- **Evaluate Security Impact**: Auth, access control, data privacy.
+- **Performance Considerations**: Resource-intensive features.

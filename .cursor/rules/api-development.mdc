@@ -1,0 +1,250 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# API Development Rules
+
+## API Structure
+
+### Directory Organization
+All API routes are located in [app/api/](mdc:app/api/) following Next.js App Router conventions.
+
+### Key API Endpoints
+- [app/api/auth/](mdc:app/api/auth/) - NextAuth.js authentication
+- [app/api/allowed-emails/](mdc:app/api/allowed-emails/) - Email validation
+- [app/api/projects/](mdc:app/api/projects/) - Project management
+- [app/api/files-search/](mdc:app/api/files-search/) - File search functionality
+
+## API Development Standards
+
+### 1. Route Handler Pattern
+```typescript
+// app/api/example/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    // Implementation
+    const data: ResponseType = await fetchData();
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 2. Type Safety
+Always define request and response types:
+```typescript
+interface ApiRequest {
+  email: string;
+  projectId: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+```
+
+### 3. Error Handling
+Consistent error response format:
+```typescript
+// Success response
+return NextResponse.json({
+  success: true,
+  data: result,
+  message: 'Operation completed successfully'
+});
+
+// Error response
+return NextResponse.json({
+  success: false,
+  error: 'Descriptive error message',
+  code: 'ERROR_CODE'
+}, { status: 400 });
+```
+
+## Authentication Integration
+
+### File-Based Authentication
+Reference the authentication system:
+- Server-side: [app/lib/serverAllowedEmails.ts](mdc:app/lib/serverAllowedEmails.ts)
+- Client-side: [app/lib/allowedEmails.ts](mdc:app/lib/allowedEmails.ts)
+
+### Email Validation Pattern
+```typescript
+import { getAllowedEmails } from '@/app/lib/serverAllowedEmails';
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const { email }: { email: string } = await request.json();
+    const allowedEmails: string[] = await getAllowedEmails();
+    
+    if (!allowedEmails.includes(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Email not authorized' },
+        { status: 403 }
+      );
+    }
+    
+    // Continue with authorized request
+  } catch (error: unknown) {
+    // Error handling
+  }
+}
+```
+
+## Common Patterns
+
+### 1. File Upload Handling
+```typescript
+import { NextRequest } from 'next/server';
+import formidable from 'formidable';
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const formData: FormData = await request.formData();
+    const file: File | null = formData.get('file') as File;
+    
+    if (!file) {
+      return NextResponse.json(
+        { success: false, error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+    
+    // Process file
+  } catch (error: unknown) {
+    // Error handling
+  }
+}
+```
+
+### 2. Database Operations
+```typescript
+// For file-based operations
+import { promises as fs } from 'fs';
+import path from 'path';
+
+export async function GET(): Promise<NextResponse> {
+  try {
+    const filePath: string = path.join(process.cwd(), 'data', 'projects.json');
+    const fileContent: string = await fs.readFile(filePath, 'utf-8');
+    const projects: Project[] = JSON.parse(fileContent);
+    
+    return NextResponse.json({ success: true, data: projects });
+  } catch (error: unknown) {
+    // Error handling
+  }
+}
+```
+
+### 3. External API Integration
+```typescript
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const requestData: ApiRequest = await request.json();
+    
+    const response: Response = await fetch('https://external-api.com/endpoint', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.API_TOKEN}`
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`External API error: ${response.status}`);
+    }
+    
+    const data: ExternalApiResponse = await response.json();
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
+    // Error handling
+  }
+}
+```
+
+## Security Best Practices
+
+### 1. Input Validation
+```typescript
+import { z } from 'zod';
+
+const requestSchema = z.object({
+  email: z.string().email(),
+  projectId: z.string().min(1),
+  data: z.object({
+    title: z.string().min(1).max(100),
+    description: z.string().optional()
+  })
+});
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const body: unknown = await request.json();
+    const validatedData = requestSchema.parse(body);
+    
+    // Use validatedData safely
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request data', details: error.errors },
+        { status: 400 }
+      );
+    }
+    // Other error handling
+  }
+}
+```
+
+### 2. Environment Variables
+```typescript
+// Always validate environment variables
+const requiredEnvVars: string[] = ['DATABASE_URL', 'API_SECRET'];
+const missingVars: string[] = requiredEnvVars.filter(
+  (varName: string) => !process.env[varName]
+);
+
+if (missingVars.length > 0) {
+  throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
+}
+```
+
+### 3. Rate Limiting
+Implement rate limiting for public endpoints:
+```typescript
+// Simple in-memory rate limiting (use Redis in production)
+const requestCounts: Map<string, number> = new Map();
+
+function checkRateLimit(ip: string): boolean {
+  const count: number = requestCounts.get(ip) || 0;
+  if (count >= 100) { // 100 requests per window
+    return false;
+  }
+  requestCounts.set(ip, count + 1);
+  return true;
+}
+```
+
+## Testing API Endpoints
+
+### 1. Manual Testing
+Use the test files in the project:
+- [test-cors.html](mdc:test-cors.html) - CORS testing
+- [test-cors.sh](mdc:test-cors.sh) - Shell script testing
+
+### 2. Unit Testing
+Follow patterns in [__tests__/api/](mdc:__tests__/api/) directory.
+
+## Configuration Files
+- [next.config.mjs](mdc:next.config.mjs) - Next.js API configuration
+- [middleware.ts](mdc:middleware.ts) - Request middleware

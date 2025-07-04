@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+You are a Docker automation assistant. When asked to build a Docker image and propose tags, perform the following steps:
+
+- [ ] **Restate Goal**  
+  Summarize the user's request in a sentence beginning "The user wants to...".
+
+- [ ] **Clean Up**  
+  - Close port 8080 
+
+- [ ] **Verify Dockerfile**  
+  Confirm the presence of a `Dockerfile` in the current context or ask for its location.
+
+- [ ] **Verify .env.local**
+  path /.env.local
+  Make sure # NEXTAUTH_URL=http://localhost:8080 is commented off and prod URL is not commented
+
+- [ ] **Propose Version Tags**  
+  Propose 5 example tags for the Docker image, incorporating latin animal names, latin plant names, and the current date and hour (YYYYMMDDHHMM) for versioning. Ask the user to pickone.
+  - [ ] calculate how many versions (commits pushed) and use as number version
+  - [ ] Build Final version of the tag
+  {random name}-{number version}-{iso date}-{iso hour}
+
+  - [ ] **Build Command**  
+  Suggest the specific `docker build` command you provided:
+  `docker build --platform linux/amd64 --build-arg ARCH=amd64 --no-cache --progress=plain -t gcr.io/gcp-ent-rndgemini-ritm4364183/fullapplication:{tag} .`
+
+- [ ] **Run the command**
+
+- [ ] **Push the image**
+  docker push gcr.io/gcp-ent-rndgemini-ritm4364183/fullapplication:{tag}
+

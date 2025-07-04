@@ -1,0 +1,58 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Authentication System Rules
+
+## File-Based Authentication Architecture
+
+This project uses a file-based authentication system reading from [all_emails.txt](mdc:all_emails.txt) instead of a database.
+
+## Key Components
+
+### Server-Side (Node.js/API Routes)
+- [app/lib/serverAllowedEmails.ts](mdc:app/lib/serverAllowedEmails.ts) - Server-side file reading with caching
+- [app/api/allowed-emails/route.ts](mdc:app/api/allowed-emails/route.ts) - API endpoint for email validation
+- Uses Node.js `fs` module for file system access
+
+### Client-Side (React Components)
+- [app/lib/allowedEmails.ts](mdc:app/lib/allowedEmails.ts) - Client-side API fetching
+- [app/components/AuthGuard.tsx](mdc:app/components/AuthGuard.tsx) - Authentication wrapper component
+- Uses fetch API to call server endpoints
+
+## Critical Rules
+
+### 1. Module Separation
+**NEVER import server-side modules (fs, path) in client-side code**
+- ❌ Wrong: `import fs from 'fs'` in React components
+- ✅ Correct: Use API routes to access file system from client
+
+### 2. Authentication Flow
+1. Client calls `getClientAllowedEmails()` from [app/lib/allowedEmails.ts](mdc:app/lib/allowedEmails.ts)
+2. Function fetches from `/api/allowed-emails` endpoint
+3. Server reads [all_emails.txt](mdc:all_emails.txt) via [app/lib/serverAllowedEmails.ts](mdc:app/lib/serverAllowedEmails.ts)
+4. Emails are cached server-side with file modification checking
+
+### 3. Email File Format
+- One email per line in [all_emails.txt](mdc:all_emails.txt)
+- Automatic trimming and validation (must contain '@')
+- Currently contains 77 authorized emails
+
+### 4. Fallback Strategy
+Always provide fallback emails in case of file read failures:
+```typescript
+return ['francesco.cozzolino@roche.com', 'altrua.ai@gmail.com'];
+```
+
+### 5. Caching Implementation
+- Server-side caching with file modification time checking
+- Prevents unnecessary file reads on every request
+- Cache invalidation when file is modified
+
+## Common Issues to Avoid
+
+1. **Build Errors**: Don't import `fs` in client-side code
+2. **Authentication Bypass**: Always validate emails server-side
+3. **Performance**: Use caching to avoid repeated file reads
+4. **Error Handling**: Provide meaningful fallbacks for file read failures

@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+You are a Cursor AI assistant. Gather and write the following to `/pre-flight/tmp/preflight-scaffold-overview.md`:
+
+- **Restate Goal**: Summarize: "The user wants to..."
+- **List Top-Level Directories**: Folder names and purposes.
+- **Identify Core Modules**: Primary services/libraries.
+- **Note External Dependencies**: Third-party integrations.
+- **Check Configuration Files**: `.env`, config.yml/json, CI/CD scripts.
+- **Spot Security-Sensitive Areas**: Auth, encryption, secrets.
+- **Flag Unsupported Versions**: Outdated frameworks/libraries.

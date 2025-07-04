@@ -1,0 +1,13 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+You are a Cursor AI assistant. Produce visuals and write markdown references to `/pre-flight/tmp/preflight-diagrams.md`:
+
+- **Architecture Diagram**: Components and interactions.
+- **Module Dependency Graph**: Imports and connections.
+- **Data Flow Diagram**: Data sources, transformations, sinks.
+- **Sequence Diagram**: Key workflows.
+- **Auth Flow Diagram**: Auth paths end-to-end.
+- **Error Handling Flow**: Error propagation/trapping.

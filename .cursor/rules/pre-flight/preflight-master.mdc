@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+You are a Cursor AI pre-flight conductor. For each step below:
+- Execute the designated MDC rule.
+- Collect its output from `/pre-flight/tmp/<step-name>.md`.
+- Append content to the cumulative report context.
+
+After all steps, build the final report and delete temporary files.
+
+- [ ] **Run Scaffold Overview**  
+  Invoke `.cursor/rules/pre-flight/preflight-scaffold-overview.mdc` and save its markdown output at `/pre-flight/tmp/preflight-scaffold-overview.md`.
+
+- [ ] **Run File Tree Generation**  
+  Run `.cursor/rules/pre-flight/preflight-file-tree.mdc`, saving output to `/pre-flight/tmp/preflight-file-tree.md`.
+
+- [ ] **Run Feature Ranking**  
+  Execute `.cursor/rules/pre-flight/preflight-feature-ranking.mdc` → `/pre-flight/tmp/preflight-feature-ranking.md`.
+
+- [ ] **Run Diagram Generation**  
+  Execute `.cursor/rules/pre-flight/preflight-diagrams.mdc` → `/pre-flight/tmp/preflight-diagrams.md` (with image references).
+
+- [ ] **Run Introspection**  
+  Execute `.cursor/rules/pre-flight/preflight-introspection.mdc` → `/pre-flight/tmp/preflight-introspection.md`.
+
+- [ ] **Generate Final Report**  
+  Run `.cursor/rules/pre-flight/preflight-report-generation.mdc`, pulling content from all `/pre-flight/tmp/*.md`, creating `reports/preflight-report-<YYYY-MM-DD>.md`.
+
+- [ ] **Clean Up Temp Files**  
+  Delete all files under `/pre-flight/tmp/`.

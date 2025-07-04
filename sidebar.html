@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Page Chat</title>
+    <link rel="stylesheet" href="sidebar.css">
+</head>
+
+<body>
+    <div class="sidebar-container">
+        <!-- Header with page info -->
+        <div class="header">
+            <div class="header-top">
+                <div class="status-indicator">
+                    <span class="status-dot disconnected" id="statusDot"></span>
+                    <span class="status-text" id="statusText">Connecting...</span>
+                </div>
+                <div class="header-actions">
+                    <button id="exportButton" class="export-button" title="Export chat as Markdown">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7,10 12,15 17,10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Export
+                    </button>
+                </div>
+            </div>
+            <div class="page-info" id="pageInfo">
+                <div class="page-title" id="pageTitle">Loading page...</div>
+                <div class="page-url" id="pageUrl"></div>
+            </div>
+        </div>
+
+        <!-- Chat messages area -->
+        <div class="chat-container" id="chatContainer">
+            <div class="chat-messages" id="chatMessages">
+                <div class="system-message">
+                    <div class="message-content">
+                        <p>👋 Hi! I'm your AI assistant. I can help you understand and discuss the current page content.
+                        </p>
+                        <p>Try asking me:</p>
+                        <ul>
+                            <li>"Summarize this page"</li>
+                            <li>"What are the main points?"</li>
+                            <li>"Explain this topic"</li>
+                            <li>"What questions should I ask about this?"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea id="messageInput" placeholder="Ask me anything about this page..." rows="1"></textarea>
+                <button id="sendButton" class="send-button" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"></path>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="input-suggestions">
+                <button class="suggestion-btn" data-message="Summarize this page">📋 Summarize</button>
+                <button class="suggestion-btn" data-message="What are the main points?">🎯 Main Points</button>
+                <button class="suggestion-btn" data-message="Explain this topic simply">💡 Explain</button>
+                <button class="suggestion-btn" data-message="What questions should I ask?">❓ Questions</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="sidebar.js"></script>
+</body>
+
+</html>

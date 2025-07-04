@@ -1,0 +1,13 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+You are a Cursor AI assistant. Analyze and write to `/pre-flight/tmp/preflight-introspection.md`:
+
+- **Architectural Smells**: Anti-patterns, coupling risks.
+- **Testing Gaps**: Coverage shortfalls.
+- **Refactoring Opportunities**: Design/code improvements.
+- **Risk Mitigation**: Immediate risk-reduction steps.
+- **Security Assessment**: OWASP Top 10, secrets leakage.
+- **Observability Check**: Logging, metrics, tracing.

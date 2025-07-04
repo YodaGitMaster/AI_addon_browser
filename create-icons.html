@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Icon Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+        }
+
+        .icon-preview {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .icon-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .generate-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .generate-btn:hover {
+            background: #5a67d8;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .canvas-container {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Auto PNG Icon Generator</h1>
+        <p>This will automatically generate and download all 4 required PNG icons for your Firefox addon.</p>
+
+        <button class="generate-btn" onclick="generateAllIcons()">Generate & Download All Icons</button>
+
+        <div class="status" id="status"></div>
+
+        <div class="icon-preview" id="preview"></div>
+
+        <div class="canvas-container">
+            <canvas id="canvas16" width="16" height="16"></canvas>
+            <canvas id="canvas32" width="32" height="32"></canvas>
+            <canvas id="canvas48" width="48" height="48"></canvas>
+            <canvas id="canvas128" width="128" height="128"></canvas>
+        </div>
+    </div>
+
+    <script>
+        function createIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+
+            // Create gradient background
+            const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+
+            // Draw background circle
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw document shape
+            const docWidth = size * 0.4;
+            const docHeight = size * 0.5;
+            const docX = size * 0.25;
+            const docY = size * 0.2;
+
+            ctx.fillStyle = 'white';
+            ctx.fillRect(docX, docY, docWidth, docHeight);
+
+            // Draw document header
+            ctx.fillStyle = '#764ba2';
+            ctx.fillRect(docX, docY, docWidth, size * 0.08);
+
+            // Draw text lines (if icon is large enough)
+            if (size >= 32) {
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = size >= 48 ? 2 : 1;
+
+                const lineStart = docX + size * 0.05;
+                const lineEnd = docX + docWidth - size * 0.05;
+                const lineSpacing = size * 0.06;
+                let lineY = docY + size * 0.15;
+
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(lineStart, lineY);
+                    ctx.lineTo(lineEnd - (i * size * 0.03), lineY);
+                    ctx.stroke();
+                    lineY += lineSpacing;
+                }
+            }
+
+            // Draw AI indicator (small green circle)
+            if (size >= 24) {
+                ctx.fillStyle = '#4caf50';
+                ctx.beginPath();
+                ctx.arc(size * 0.75, size * 0.35, size * 0.08, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(size * 0.75, size * 0.35, size * 0.04, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function generateAllIcons() {
+            const statusEl = document.getElementById('status');
+            const previewEl = document.getElementById('preview');
+
+            statusEl.textContent = 'Generating icons...';
+            statusEl.className = 'status';
+            statusEl.style.display = 'block';
+
+            // Clear preview
+            previewEl.innerHTML = '';
+
+            const sizes = [16, 32, 48, 128];
+            let completed = 0;
+
+            sizes.forEach(size => {
+                const canvas = document.getElementById(`canvas${size}`);
+                createIcon(canvas, size);
+
+                // Add to preview
+                const iconItem = document.createElement('div');
+                iconItem.className = 'icon-item';
+                iconItem.innerHTML = `
+                    <h4>${size}x${size}</h4>
+                    <img src="${canvas.toDataURL('image/png')}" style="border: 1px solid #ddd;" alt="${size}x${size} icon">
+                `;
+                previewEl.appendChild(iconItem);
+
+                // Auto-download
+                setTimeout(() => {
+                    downloadCanvas(canvas, `icon-${size}.png`);
+                    completed++;
+
+                    if (completed === sizes.length) {
+                        statusEl.textContent = '✅ All icons generated and downloaded! Save them to your icons/ folder.';
+                        statusEl.className = 'status success';
+                    }
+                }, 100 * (size / 16)); // Stagger downloads slightly
+            });
+        }
+
+        // Auto-generate on page load for convenience
+        window.addEventListener('load', () => {
+            // Small delay to ensure page is fully loaded
+            setTimeout(() => {
+                document.querySelector('.generate-btn').textContent = 'Auto-Generating Icons...';
+                generateAllIcons();
+            }, 500);
+        });
+    </script>
+</body>
+
+</html>

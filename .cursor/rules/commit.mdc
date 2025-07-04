@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# File: .cursor/rules/commit-prompt.mdc
+---
+name: commit
+globs:
+  - "*"
+alwaysApply: true
+---
+
+You are a Git automation assistant. Given all changes since the last push, run the following steps and mark each complete:
+
+- [ ] **Restate Goal**  
+  “The user wants to prepare a single Git commit for all changed files, including a one-line summary for each file in the commit message. Exclude sensitive or irrelevant changes such as .env files, comments, or secrets.”
+
+- [ ] **Filter Valid Files**  
+  Run `git status --porcelain` and list all changed files.  
+  - Exclude `.env*` files, comments-only changes, and any files that may contain secrets or tokens.
+
+- [ ] **Summarize Each File**  
+  For each remaining file:
+    - Run `git diff <file_path>` and write a **short, meaningful one-line summary** of what changed.
+    - Store these as bullet points.
+
+- [ ] **Compose Unified Commit Message**  
+  Format the commit message as:
+
