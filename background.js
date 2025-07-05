@@ -6,8 +6,11 @@ let chatWindow = null;
 
 // Handle extension icon click
 browser.action.onClicked.addListener(async () => {
-    console.log('Extension icon clicked');
+    console.log('=== EXTENSION ICON CLICKED ===');
+    console.log('Opening chat window...');
+    console.log('Stack trace:', new Error().stack);
     await openChatWindow();
+    console.log('Chat window opened');
 });
 
 // Handle extension installation
@@ -20,14 +23,7 @@ browser.runtime.onInstalled.addListener(() => {
 
 // Handle messages from content script and sidebar
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'contextMenuAction') {
-        // Forward context menu actions to sidebar
-        browser.runtime.sendMessage({
-            action: 'contextMenuAction',
-            menuItemId: message.menuItemId,
-            selectedText: message.selectedText
-        });
-    } else if (message.action === 'captureScreenshot') {
+    if (message.action === 'captureScreenshot') {
         // Capture visible tab screenshot
         browser.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
             if (browser.runtime.lastError) {
@@ -150,7 +146,13 @@ function createContextMenus() {
 
 // Handle context menu clicks
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
-    console.log('Context menu clicked:', info.menuItemId);
+    console.log('=== CONTEXT MENU CLICKED ===');
+    console.log('Menu ID:', info.menuItemId);
+    console.log('Selection text:', info.selectionText);
+    console.log('Page URL:', info.pageUrl);
+    console.log('Tab info:', tab);
+    console.log('Full info object:', info);
+    console.log('Stack trace:', new Error().stack);
     
     // Open chat window first
     await openChatWindow();

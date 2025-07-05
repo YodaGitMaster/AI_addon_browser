@@ -25,27 +25,30 @@ async function extractPageContent(includeScreenshots = false) {
   // Detect charts and graphs (conditionally including screenshots)
   const charts = await detectCharts(includeScreenshots);
   
-  // Extract main content - try multiple selectors for better content detection
+  // Extract main content - prioritize main element, fallback to full page
   let mainContent = '';
+  let contentSource = 'unknown';
   
-  // Common content selectors (ordered by specificity)
+  // Priority content selectors (article > main > all page)
   const contentSelectors = [
-    'article',
-    'main',
-    '[role="main"]',
-    '.content',
-    '.post-content',
-    '.entry-content',
-    '.article-content',
-    '#content',
-    '.main-content',
-    'body'
+    { selector: 'article', name: 'article element' },
+    { selector: 'main', name: 'main element' },
+    { selector: '[role="main"]', name: 'main role' },
+    { selector: '.content', name: 'content class' },
+    { selector: '.post-content', name: 'post content' },
+    { selector: '.entry-content', name: 'entry content' },
+    { selector: '.article-content', name: 'article content' },
+    { selector: '#content', name: 'content id' },
+    { selector: '.main-content', name: 'main content class' },
+    { selector: 'body', name: 'full page body' }
   ];
   
   let contentElement = null;
-  for (const selector of contentSelectors) {
+  for (const { selector, name } of contentSelectors) {
     contentElement = document.querySelector(selector);
     if (contentElement) {
+      contentSource = name;
+      console.log(`AI Page Chat: Using ${name} for content extraction`);
       break;
     }
   }
@@ -54,19 +57,115 @@ async function extractPageContent(includeScreenshots = false) {
     // Clone the element to avoid modifying the original
     const clone = contentElement.cloneNode(true);
     
-    // Remove unwanted elements
+    // Remove unwanted elements - comprehensive list of accessory elements
     const unwantedSelectors = [
+      // Navigation elements
       'nav', 'header', 'footer', 'aside',
-      '.nav', '.navigation', '.menu',
-      '.sidebar', '.widget', '.advertisement',
-      '.social-share', '.comments', '.comment',
-      'script', 'style', 'noscript'
+      '.nav', '.navigation', '.menu', '.navbar', '.nav-bar',
+      '.breadcrumb', '.breadcrumbs', '.crumb', '.crumbs',
+      '.pagination', '.pager', '.page-nav',
+      
+      // Sidebar and widget areas
+      '.sidebar', '.side-bar', '.widget', '.widgets',
+      '.left-sidebar', '.right-sidebar', '.sidebar-left', '.sidebar-right',
+      '.secondary', '.tertiary', '.complementary',
+      
+      // Advertising and promotional content
+      '.advertisement', '.ad', '.ads', '.advert', '.banner',
+      '.promo', '.promotion', '.promotional', '.sponsored',
+      '.affiliate', '.marketing', '.campaign',
+      
+      // Social and sharing elements
+      '.social', '.social-share', '.share', '.sharing',
+      '.follow', '.subscribe', '.newsletter',
+      '.social-media', '.social-links', '.social-icons',
+      
+      // Comments and user interaction
+      '.comments', '.comment', '.comment-section',
+      '.reviews', '.review', '.rating', '.ratings',
+      '.feedback', '.discussion', '.replies',
+      
+      // Related content and recommendations
+      '.related', '.related-posts', '.related-articles',
+      '.recommended', '.suggestions', '.more-posts',
+      '.popular', '.trending', '.you-might-like',
+      
+      // Footnotes and references
+      '.footnotes', '.footnote', '.references', '.refs',
+      '.endnotes', '.bibliography', '.citations',
+      
+      // Metadata and publication info
+      '.meta', '.metadata', '.post-meta', '.article-meta',
+      '.byline', '.author-info', '.publish-date',
+      '.tags', '.categories', '.taxonomy',
+      
+      // Search and filters
+      '.search', '.search-form', '.filter', '.filters',
+      '.sort', '.sorting', '.facets',
+      
+      // Cookie notices and legal
+      '.cookie', '.cookies', '.gdpr', '.privacy-notice',
+      '.legal', '.disclaimer', '.terms',
+      
+      // Popups and overlays
+      '.popup', '.modal', '.overlay', '.lightbox',
+      '.tooltip', '.dropdown', '.flyout',
+      
+      // Skip links and accessibility
+      '.skip-link', '.skip-nav', '.screen-reader',
+      '.sr-only', '.visually-hidden', '.accessibility',
+      
+      // Technical elements
+      'script', 'style', 'noscript', 'iframe',
+      '.embed', '.embedded', '.video-player',
+      
+      // Common CMS and theme elements
+      '.wp-block-group', '.wp-block-columns', '.wp-block-sidebar',
+      '.elementor-widget', '.vc_row', '.fusion-builder',
+      '.et_pb_section', '.et_pb_row',
+      
+      // Print and media-specific
+      '.print-only', '.no-print', '.mobile-only', '.desktop-only',
+      
+      // Common ID-based elements
+      '#header', '#footer', '#sidebar', '#navigation',
+      '#comments', '#related', '#social', '#ads'
     ];
     
+    let removedCount = 0;
     unwantedSelectors.forEach(selector => {
       const elements = clone.querySelectorAll(selector);
+      removedCount += elements.length;
       elements.forEach(el => el.remove());
     });
+    
+    // Remove elements with common unwanted attributes
+    const attributeSelectors = [
+      '[role="banner"]', '[role="navigation"]', '[role="complementary"]',
+      '[role="contentinfo"]', '[role="search"]', '[role="form"]',
+      '[data-ad]', '[data-advertisement]', '[data-widget]',
+      '[class*="ad-"]', '[class*="advertisement"]', '[class*="promo"]',
+      '[class*="sidebar"]', '[class*="widget"]', '[class*="social"]'
+    ];
+    
+    attributeSelectors.forEach(selector => {
+      const elements = clone.querySelectorAll(selector);
+      removedCount += elements.length;
+      elements.forEach(el => el.remove());
+    });
+    
+    // Remove very small text blocks (likely noise)
+    const textElements = clone.querySelectorAll('div, p, span');
+    let smallElementsRemoved = 0;
+    textElements.forEach(el => {
+      const text = el.textContent.trim();
+      if (text.length < 10 && !el.querySelector('img, video, canvas')) {
+        el.remove();
+        smallElementsRemoved++;
+      }
+    });
+    
+    console.log(`AI Page Chat: Removed ${removedCount} accessory elements and ${smallElementsRemoved} small text blocks`);
     
     // Get text content and clean it up
     mainContent = clone.textContent || clone.innerText || '';
@@ -83,6 +182,16 @@ async function extractPageContent(includeScreenshots = false) {
     }
   }
   
+  // Check content quality and add info
+  const contentInfo = {
+    source: contentSource,
+    length: mainContent.length,
+    hasMainElement: !!document.querySelector('main'),
+    fallbackUsed: contentSource === 'full page body'
+  };
+  
+  console.log('AI Page Chat: Content extraction info:', contentInfo);
+  
   // Return structured data
   return {
     title: title,
@@ -90,6 +199,7 @@ async function extractPageContent(includeScreenshots = false) {
     textContent: mainContent,
     tables: tables,
     charts: charts,
+    contentInfo: contentInfo,
     metadata: {
       description: description,
       keywords: keywords,

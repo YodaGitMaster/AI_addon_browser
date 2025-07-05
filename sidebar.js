@@ -242,6 +242,8 @@ function handleKeyDown(e) {
 async function handleSendMessage() {
     const userMessage = elements.messageInput.value.trim();
     if (!userMessage || isProcessing) return;
+    
+    isProcessing = true;
 
     try {
         // Clear any previous pending state first
@@ -258,8 +260,30 @@ async function handleSendMessage() {
         // Store images globally for removal functionality
         window.pendingImages = [...displayImages];
 
-        // Show draft message with removable images
-        const draftMessageDiv = addMessage('user', userMessage, window.pendingImages, true);
+        // Only show draft message if there are images that need management
+        let draftMessageDiv = null;
+        if (window.pendingImages.length > 0) {
+            // Start with no images selected - user must explicitly choose
+            draftMessageDiv = addMessage('user', userMessage, [], true);
+            
+            // Ensure there's an images container for selections to be displayed
+            if (!draftMessageDiv.querySelector('.images-container')) {
+                const imagesContainer = document.createElement('div');
+                imagesContainer.className = 'images-container';
+                imagesContainer.style.cssText = `
+                    display: none;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    margin-bottom: 12px;
+                    padding: 8px;
+                    background: rgba(0, 0, 0, 0.05);
+                    border-radius: 8px;
+                `;
+                
+                const messageContent = draftMessageDiv.querySelector('.message-content');
+                messageContent.insertBefore(imagesContainer, messageContent.firstChild);
+            }
+        }
         
         // Add send confirmation buttons if there are images
         if (window.pendingImages.length > 0) {
@@ -284,7 +308,7 @@ async function handleSendMessage() {
             `;
 
             const manageButton = document.createElement('button');
-            manageButton.textContent = 'Manage Images';
+            manageButton.textContent = 'Select Images';
             manageButton.style.cssText = `
                 background: #ffc107; /* Yellow */
                 color: black;
@@ -342,21 +366,19 @@ async function handleSendMessage() {
     } catch (error) {
         addMessage('error', 'An unexpected error occurred. Please try again.');
         console.error('Error preparing message:', error);
+    } finally {
+        isProcessing = false;
     }
 }
 
 // Send message with specified images
 async function sendMessageWithImages(userMessage, selectedImages) {
-    console.log('=== SEND MESSAGE WITH IMAGES DEBUG ===');
-    console.log('Function called with selectedImages length:', selectedImages.length);
-    console.log('selectedImages preview:', selectedImages.map((img, i) => i + ': ' + img.substring(0, 30) + '...'));
-    console.log('=== END SEND MESSAGE DEBUG ===');
     
     try {
-        // Remove the draft message
+        // Remove the draft message (only exists if there were images)
         const draftMessages = document.querySelectorAll('.user-message');
         const lastDraft = draftMessages[draftMessages.length - 1];
-        if (lastDraft && lastDraft.querySelector('button')) {
+        if (lastDraft && (lastDraft.querySelector('button') || lastDraft.querySelector('.images-container'))) {
             lastDraft.remove();
         }
         
@@ -407,15 +429,16 @@ async function callOllamaAPIWithImages(userMessage, images) {
     let prompt;
     
     if (images.length > 0) {
-        // Image-only context: Focus on trading analysis with commentary
+        // Image-only context: Focus on trading analysis starting with chart values
         prompt = `You are a professional trading analyst. Analyze the charts/graphs in the provided images and provide:
 
-1. **Chart Commentary**: Brief description of what you see in the chart (price action, patterns, key levels)
-2. **Technical Analysis**: Explain the current trend, support/resistance levels, and any notable patterns or indicators
-3. **Market Outlook**: Quick assessment of the overall direction (bullish/bearish/sideways)
-4. **Recommendation**: Clear BUY or SELL recommendation with brief reasoning
+1. **Chart Values & Data**: Start by describing the specific values, prices, timeframes, and data points visible in the chart (current price, highs, lows, volume, dates, etc.)
+2. **Chart Commentary**: Describe what you see in the chart (price action, patterns, key levels, formations)
+3. **Technical Analysis**: Explain the current trend, support/resistance levels, and any notable patterns or indicators
+4. **Market Outlook**: Quick assessment of the overall direction (bullish/bearish/sideways)
+5. **Recommendation**: Clear BUY or SELL recommendation with brief reasoning
 
-Keep your response focused, informative, and actionable. Focus only on the visual data in the images.
+IMPORTANT: Always start with the actual chart values and data points before moving to analysis. Focus only on the visual data in the images.
 
 User request: ${userMessage}`;
     } else {
@@ -852,9 +875,19 @@ function showImageManagerModal(draftMessageDiv) {
 
     // Title
     const title = document.createElement('h3');
-    title.textContent = 'Manage Images';
+    title.textContent = 'Select Images to Include';
     title.style.marginTop = '0';
     modalContent.appendChild(title);
+
+    // Instructions
+    const instructions = document.createElement('p');
+    instructions.textContent = 'Check the images you want to include in your message:';
+    instructions.style.cssText = `
+        margin-bottom: 15px;
+        color: #666;
+        font-size: 14px;
+    `;
+    modalContent.appendChild(instructions);
 
     // Image grid
     const imageGrid = document.createElement('div');
@@ -866,48 +899,126 @@ function showImageManagerModal(draftMessageDiv) {
     `;
     modalContent.appendChild(imageGrid);
     
-    // Get current images from the draft message
-    const imageElements = draftMessageDiv.querySelectorAll('.images-container .image-wrapper');
+    // Get all available images from window.pendingImages
+    const allImages = window.pendingImages || [];
     
-    imageElements.forEach(wrapper => {
+    allImages.forEach((imageData, index) => {
         const itemContainer = document.createElement('div');
-        itemContainer.style.textAlign = 'center';
+        itemContainer.style.cssText = `
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            transition: border-color 0.2s;
+        `;
 
-        const img = wrapper.querySelector('img').cloneNode(true);
-        img.style.maxWidth = '200px';
-        img.style.maxHeight = '150px';
-        itemContainer.appendChild(img);
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = 'Remove';
-        removeBtn.style.cssText = `
-            display: block;
-            margin: 8px auto 0;
-            background: #ff4444;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
+        // Checkbox for selection
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `image-${index}`;
+        checkbox.style.cssText = `
+            margin-bottom: 8px;
+            transform: scale(1.2);
         `;
         
-        removeBtn.onclick = () => {
-            // Remove from modal
-            itemContainer.remove();
-            // Remove the original from the draft message in the background
-            wrapper.remove();
+        // Label for checkbox
+        const label = document.createElement('label');
+        label.htmlFor = `image-${index}`;
+        label.textContent = `Image ${index + 1}`;
+        label.style.cssText = `
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        `;
+
+        // Image preview
+        const img = document.createElement('img');
+        img.src = imageData;
+        img.style.cssText = `
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        `;
+        
+        // Click image to toggle checkbox
+        img.onclick = () => {
+            checkbox.checked = !checkbox.checked;
+            updateContainerStyle();
         };
         
-        itemContainer.appendChild(removeBtn);
+        // Update container style based on selection
+        const updateContainerStyle = () => {
+            if (checkbox.checked) {
+                itemContainer.style.borderColor = '#28a745';
+                itemContainer.style.backgroundColor = '#f8fff9';
+            } else {
+                itemContainer.style.borderColor = '#ddd';
+                itemContainer.style.backgroundColor = 'white';
+            }
+        };
+        
+        checkbox.onchange = updateContainerStyle;
+        
+        itemContainer.appendChild(checkbox);
+        itemContainer.appendChild(label);
+        itemContainer.appendChild(img);
         imageGrid.appendChild(itemContainer);
     });
 
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'Done';
-    closeBtn.style.cssText = `
-        display: block;
-        margin: 20px auto 0;
+    // Button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
+    `;
+
+    // Select All button
+    const selectAllBtn = document.createElement('button');
+    selectAllBtn.textContent = 'Select All';
+    selectAllBtn.style.cssText = `
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    selectAllBtn.onclick = () => {
+        const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+            cb.onchange();
+        });
+    };
+
+    // Clear All button
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.textContent = 'Clear All';
+    clearAllBtn.style.cssText = `
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    clearAllBtn.onclick = () => {
+        const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+            cb.onchange();
+        });
+    };
+
+    // Apply Selection button
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Apply Selection';
+    applyBtn.style.cssText = `
         background: #007bff;
         color: white;
         border: none;
@@ -915,11 +1026,106 @@ function showImageManagerModal(draftMessageDiv) {
         border-radius: 4px;
         cursor: pointer;
     `;
-    closeBtn.onclick = () => document.body.removeChild(modal);
-    modalContent.appendChild(closeBtn);
+    applyBtn.onclick = () => {
+        // Get selected images
+        const selectedImages = [];
+        const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach((cb, index) => {
+            if (cb.checked) {
+                selectedImages.push(allImages[index]);
+            }
+        });
+        
+        // Update the draft message to show only selected images
+        updateDraftMessageImages(draftMessageDiv, selectedImages);
+        
+        // Close modal
+        document.body.removeChild(modal);
+    };
+
+    buttonContainer.appendChild(selectAllBtn);
+    buttonContainer.appendChild(clearAllBtn);
+    buttonContainer.appendChild(applyBtn);
+    modalContent.appendChild(buttonContainer);
 
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
+}
+
+// Helper function to update draft message with selected images
+function updateDraftMessageImages(draftMessageDiv, selectedImages) {
+    // Find the images container in the draft message
+    const imagesContainer = draftMessageDiv.querySelector('.images-container');
+    
+    if (imagesContainer) {
+        // Clear existing images
+        imagesContainer.innerHTML = '';
+        
+        // Add selected images
+        selectedImages.forEach((imageData, index) => {
+            const imageWrapper = document.createElement('div');
+            imageWrapper.className = 'image-wrapper';
+            imageWrapper.style.cssText = `
+                position: relative;
+                display: inline-block;
+            `;
+            
+            const imagePreview = document.createElement('img');
+            imagePreview.src = imageData;
+            imagePreview.style.cssText = `
+                max-width: 150px;
+                max-height: 100px;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                cursor: pointer;
+                transition: transform 0.2s;
+            `;
+            
+            // Add hover effect
+            imagePreview.onmouseover = () => imagePreview.style.transform = 'scale(1.05)';
+            imagePreview.onmouseout = () => imagePreview.style.transform = 'scale(1)';
+            
+            // Add click to view full size
+            imagePreview.onclick = () => {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    cursor: pointer;
+                `;
+                
+                const fullImage = document.createElement('img');
+                fullImage.src = imagePreview.src;
+                fullImage.style.cssText = `
+                    max-width: 90%;
+                    max-height: 90%;
+                    border-radius: 8px;
+                `;
+                
+                modal.appendChild(fullImage);
+                modal.onclick = () => document.body.removeChild(modal);
+                document.body.appendChild(modal);
+            };
+            
+            imageWrapper.appendChild(imagePreview);
+            imagesContainer.appendChild(imageWrapper);
+        });
+        
+        // Hide images container if no images selected
+        if (selectedImages.length === 0) {
+            imagesContainer.style.display = 'none';
+        } else {
+            imagesContainer.style.display = 'flex';
+        }
+    }
 }
 
 // Format message content with markdown rendering
@@ -1177,16 +1383,23 @@ function showExportModal(markdownContent) {
 // Handle messages from background script (context menu actions)
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'contextMenuAction') {
-        console.log('Context menu action received:', message.menuItemId);
+        console.log('=== CONTEXT MENU ACTION RECEIVED ===');
+        console.log('Menu ID:', message.menuItemId);
+        console.log('Selected text:', message.selectedText);
+        console.log('Page URL:', message.pageUrl);
+        console.log('Message sender:', sender);
+        console.log('Full message:', message);
+        console.log('Stack trace:', new Error().stack);
         
         // Generate appropriate prompt based on context menu selection
         let prompt = '';
         
         switch (message.menuItemId) {
             case 'ai-chat':
+                // Only populate if there's selected text, otherwise leave input clean
                 prompt = message.selectedText ? 
                     `Please explain this selected text: "${message.selectedText}"` :
-                    'Help me understand this page';
+                    '';
                 break;
                 
             case 'fact-check':
@@ -1246,15 +1459,18 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
         }
         
-        // Set the prompt in the input field and send it
-        if (prompt) {
+        // Set the prompt in the input field (user must manually send)
+        if (prompt && prompt.trim() !== '') {
+            // Clear input field first to prevent duplication
+            elements.messageInput.value = '';
             elements.messageInput.value = prompt;
             handleInputChange(); // Update send button state
             
-            // Auto-send the message after a short delay
-            setTimeout(() => {
-                handleSendMessage();
-            }, 500);
+            // Focus the input field to indicate it's ready for editing/sending
+            elements.messageInput.focus();
+        } else {
+            // Just focus the input field for clean start
+            elements.messageInput.focus();
         }
     }
 });

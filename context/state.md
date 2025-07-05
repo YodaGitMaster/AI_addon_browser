@@ -14,20 +14,76 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - [x] Create comprehensive documentation
 - [x] Create icon generation system
 - [x] Fix 403 Forbidden CORS error
+- [x] Fix double message issue when clicking suggestion buttons
+- [x] Restore context menu functionality for right-click access
+- [x] Implement inverse image selection logic
 
-## Active Issue: Image Removal Bug Investigation
-- **Status**: FIXED - CSS class mismatch resolved
-- **Problem**: × buttons not removing images from `window.pendingImages` array
-- **Root Cause**: CSS selector `.images-container .image-wrapper` couldn't find elements because `image-wrapper` class was missing
-- **Solution**: Added `imageWrapper.className = 'image-wrapper';` to line 725
-- **Current Step**: Ready for user testing
+## Latest Major Enhancement: Chart Analysis Enhancement
+- **Status**: COMPLETED - Enhanced trading analysis with values-first approach
+- **Change**: Chart analysis now always starts with data values description
+- **NEW Structure**: 
+  1. **Chart Values & Data** - Specific prices, timeframes, data points
+  2. **Chart Commentary** - Visual patterns and formations
+  3. **Technical Analysis** - Trends, support/resistance, indicators
+  4. **Market Outlook** - Direction assessment
+  5. **Recommendation** - Clear BUY/SELL with reasoning
+- **Benefits**: 
+  - More structured and comprehensive analysis
+  - Always starts with concrete data before interpretation
+  - Better context for trading decisions
+  - Consistent analysis format
+
+## Previous Enhancement: Image Selection UX Overhaul
+- **Status**: COMPLETED - Inverse selection logic implemented
+- **Change**: FROM removal-based TO selection-based image management
+- **OLD**: All images included by default, user removes unwanted ones
+- **NEW**: No images selected by default, user explicitly selects desired ones
+- **Benefits**: 
+  - More intuitive UX (explicit selection vs deletion)
+  - Better control over what gets sent to AI
+  - Clearer visual feedback with checkboxes
+  - Select All/Clear All convenience buttons
+
+## Content Extraction Priority Update
+- **Status**: COMPLETED - Optimized content focus with comprehensive filtering
+- **Priority**: article > main > all page
+- **Logic**: 
+  1. `<article>` - Most specific for article content
+  2. `<main>` - Main content area fallback  
+  3. Full page body - Last resort fallback
+- **Comprehensive Filtering**: Removes all accessory elements:
+  - Navigation (nav, breadcrumbs, pagination)
+  - Sidebars and widgets (all variations)
+  - Advertising and promotional content
+  - Social sharing and follow buttons
+  - Comments and user interaction sections
+  - Related content and recommendations
+  - Footnotes and references
+  - Metadata and publication info
+  - Search and filter elements
+  - Cookie notices and legal text
+  - Popups and overlays
+  - Technical elements (scripts, iframes)
+  - CMS-specific elements (WordPress, Elementor, etc.)
+  - Small text blocks (< 10 characters)
+- **Benefits**: 
+  - Much cleaner context focused on main content
+  - Better AI analysis with reduced noise
+  - Consistent content quality across different websites
+  - Graceful degradation when semantic elements missing
 
 ## Last Completed Action
-- **ENHANCED**: Trading analysis prompt to be more informative and engaging
-- When images are sent: Only user message + enhanced trading prompt (no page context)
-- Enhanced prompt includes: chart commentary, technical analysis, market outlook, recommendation
-- Structure: 4-part analysis (commentary → technical → outlook → buy/sell)
-- Still eliminates page text, tables, charts, and chat history for clean image-only analysis
+- **FIXED**: Double message issue resolved
+- Root cause: Both `handleSendMessage` and `sendMessageWithImages` were calling `addMessage` for user messages
+- Solution: Only create draft messages when images are present, improved draft removal logic
+- **RESTORED**: Context menu functionality for right-click access
+- Re-enabled context menu click handler after fixing auto-input issue
+- Context menus now populate input field without auto-sending (user control maintained)
+- **IMPLEMENTED**: Inverse image selection logic
+- Modal now shows checkboxes for selection instead of remove buttons
+- Images start unselected, user must explicitly check desired ones
+- Added Select All/Clear All buttons for convenience
+- Visual feedback with green border/background for selected images
 
 ## Next Required Steps
 1. **TEST**: User tests enhanced trading analysis functionality
