@@ -1,5 +1,7 @@
 # Cumulative Findings & Insights
 
+**Last Updated:** 2024-07-25
+
 ## Key Discoveries
 
 ### 2024-12-19 Multi-Tab Context Selection Implementation
@@ -97,6 +99,50 @@
 - **Space Advantages**: Sidebar provides much more room for longer conversations
 - **Persistence**: Not closing when user clicks outside is crucial for workflow
 - **UPDATE**: Reverted to enhanced popup for Firefox compatibility, maintaining all benefits
+
+### 2024-07-25: Robust Markdown Table Rendering
+- **Insight**: The initial markdown parser was too simplistic and failed to render tables correctly, especially when cell counts were inconsistent between rows.
+- **Solution**: Replaced the naive table parser in `sidebar.js` with a more robust implementation.
+- **Details**:
+  * The new `parseMarkdownTable` function correctly handles rows with leading/trailing pipes.
+  * It enforces a strict column count based on the table header, padding any missing cells to ensure a uniform grid.
+  * Injected CSS into the sidebar to provide clean, readable styling for tables (borders, padding, alternating row colors).
+- **Conclusion**: This significantly improves the display of structured data in the chat, making comparisons and analyses much clearer for the user.
+
+### 2024-07-25: Content Image Detection and Capture
+- **Insight**: Similar to chart detection, the extension needed the ability to detect and capture content images from web pages for AI analysis.
+- **Solution**: Implemented a comprehensive image detection system in `content-script.js` and integrated it into the sidebar workflow.
+- **Details**:
+  * Added `detectImages()` function that finds content images while filtering out UI elements (icons, logos, buttons).
+  * Implements intelligent filtering: minimum size requirements, context detection, navigation exclusion.
+  * Captures and compresses images when screenshots are requested, similar to chart handling.
+  * Detects both `<img>` elements and CSS background images in content areas.
+  * Integrated into `sidebar.js` with image context in prompts and screenshot extraction for AI analysis.
+- **Conclusion**: The extension can now analyze visual content beyond just charts, making it more versatile for pages with photos, diagrams, and other visual content.
+
+### 2024-07-25: Dynamic Content Scraping
+- **Insight**: The initial content script was designed for single-article pages and only scraped the first `<article>` element it found. This failed on listing pages like Idealista.
+- **Solution**: Implemented a more intelligent content scraper in `content-script.js`.
+- **Details**:
+  * The script now first checks for characteristics of a listing page (e.g., multiple `article.item` elements).
+  * If detected, it activates a custom scraper that iterates through all items, extracts key data (title, price, details), and formats it into a markdown summary.
+  * If not a list page, it falls back to the original generic content extraction logic.
+- **Conclusion**: The extension can now handle both single-topic pages and multi-item listing pages, making it much more versatile.
+
+### Image Detection Filter Optimization (2024-01-XX)
+- **Issue**: Original image detection was too restrictive, finding no images on most pages
+- **Root Cause**: Multiple overly strict filters:
+  - Size requirement: BOTH display ≥100px AND natural ≥200px (too restrictive)
+  - Context requirement: Required specific parent elements (figure, article, etc.)
+  - Class exclusions: Broad exclusions for "icon", "logo", "avatar" class names
+  - Navigation exclusions: Excluded images in header/footer/nav areas entirely
+- **Solution**: Relaxed all filters to be more inclusive:
+  - Size: ANY of display ≥50px, natural ≥100px, OR width/height ≥100px
+  - Context: Optional (just for metadata, not filtering)
+  - Exclusions: Only tiny icons (≤32px) and clear UI buttons
+  - Navigation: Removed navigation exclusions entirely
+- **Result**: System now detects images across full page instead of zero images
+- **Debug Strategy**: Added comprehensive logging for every filter step to identify issues
 
 ## Pattern Observations
 - Firefox addons use message passing between content and background scripts

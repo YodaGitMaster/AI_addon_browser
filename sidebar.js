@@ -12,6 +12,12 @@ const OLLAMA_CONFIG = {
 let currentPageContext = null;
 let chatHistory = [];
 let isProcessing = false;
+const MAX_TOKEN_LIMIT = 128000; // Gemma3 4B model has a 128k token context window
+const TOKEN_ESTIMATION_FACTOR = 1.3; // Rough estimate: 1 word ~ 1.3 tokens
+let currentImages = []; // Array to store currently selected image dataURLs and their original URLs
+let currentContext = { content: '', images: [] }; // Object to store the current page context
+let draftMessage = null; // To store the draft message when images are being analyzed
+let selectedTabsData = []; // Store content and metadata of selected tabs for multi-tab context
 
 // State management functions
 function clearPendingState() {
@@ -133,7 +139,8 @@ async function loadPageContext() {
                     url: contentResponse.data.url,
                     content: contentResponse.data.textContent,
                     tables: contentResponse.data.tables || [],
-                    charts: contentResponse.data.charts || []
+                    charts: contentResponse.data.charts || [],
+                    images: contentResponse.data.images || []
                 };
                 
                 // Update UI
@@ -143,6 +150,7 @@ async function loadPageContext() {
                 console.log('Page context loaded:', currentPageContext.title);
                 console.log('Tables found:', currentPageContext.tables.length);
                 console.log('Charts found:', currentPageContext.charts.length);
+                console.log('Images found:', currentPageContext.images.length);
             } else {
                 throw new Error('Failed to extract page content');
             }
@@ -168,7 +176,8 @@ async function loadPageContext() {
                         url: contentResponse.data.url,
                         content: contentResponse.data.textContent,
                         tables: contentResponse.data.tables || [],
-                        charts: contentResponse.data.charts || []
+                        charts: contentResponse.data.charts || [],
+                        images: contentResponse.data.images || []
                     };
                     
                     elements.pageTitle.textContent = currentPageContext.title;
@@ -177,6 +186,7 @@ async function loadPageContext() {
                     console.log('Page context loaded from recent tab:', currentPageContext.title);
                     console.log('Tables found:', currentPageContext.tables.length);
                     console.log('Charts found:', currentPageContext.charts.length);
+                    console.log('Images found:', currentPageContext.images.length);
                 } else {
                     throw new Error('Failed to extract content from any tab');
                 }
@@ -344,10 +354,13 @@ async function handleSendMessage() {
                 const currentImageElements = draftMessageDiv.querySelectorAll('.images-container img');
                 const currentImages = Array.from(currentImageElements).map(img => img.src);
                 
-                console.log('Sending message with', currentImages.length, 'images.');
+                // Get the page text context option from the draft message
+                const includePageText = draftMessageDiv.dataset.includePageText === 'true';
+                
+                console.log('Sending message with', currentImages.length, 'images and page text context:', includePageText);
 
                 draftMessageDiv.remove(); // Remove the entire draft message
-                sendMessageWithImages(userMessage, currentImages);
+                sendMessageWithImages(userMessage, currentImages, includePageText);
             };
             
             cancelButton.onclick = () => {
@@ -364,7 +377,7 @@ async function handleSendMessage() {
             draftMessageDiv.querySelector('.message-content').appendChild(confirmContainer);
         } else {
             // No images, just send the message directly
-            sendMessageWithImages(userMessage, []);
+            sendMessageWithImages(userMessage, [], false);
         }
         
     } catch (error) {
@@ -376,7 +389,7 @@ async function handleSendMessage() {
 }
 
 // Send message with specified images
-async function sendMessageWithImages(userMessage, selectedImages) {
+async function sendMessageWithImages(userMessage, selectedImages, includePageText = false) {
     
     try {
         // Remove the draft message (only exists if there were images)
@@ -399,7 +412,7 @@ async function sendMessageWithImages(userMessage, selectedImages) {
         const apiImages = selectedImages.map(img => img.split(',')[1]);
         
         // Call Ollama API with selected images
-        const response = await callOllamaAPIWithImages(userMessage, apiImages);
+        const response = await callOllamaAPIWithImages(userMessage, apiImages, includePageText);
         
         // Remove typing indicator
         hideTypingIndicator();
@@ -428,23 +441,52 @@ async function sendMessageWithImages(userMessage, selectedImages) {
 }
 
 // Call Ollama API with specific images
-async function callOllamaAPIWithImages(userMessage, images) {
+async function callOllamaAPIWithImages(userMessage, images, includePageText = false) {
     // Create different prompts based on whether images are present
     let prompt;
     
     if (images.length > 0) {
-        // Image-only context: Focus on trading analysis starting with chart values
-        prompt = `You are a professional trading analyst. Analyze the charts/graphs in the provided images and provide:
+        // Images provided - create context-aware prompt
+        if (includePageText) {
+            // Include page context for better image understanding
+            prompt = `You are an AI assistant analyzing images with page context. 
 
-1. **Chart Values & Data**: Start by describing the specific values, prices, timeframes, and data points visible in the chart (current price, highs, lows, volume, dates, etc.)
-2. **Chart Commentary**: Describe what you see in the chart (price action, patterns, key levels, formations)
-3. **Technical Analysis**: Explain the current trend, support/resistance levels, and any notable patterns or indicators
-4. **Market Outlook**: Quick assessment of the overall direction (bullish/bearish/sideways)
-5. **Recommendation**: Clear BUY or SELL recommendation with brief reasoning
+**Page Context:**
+`;
+            
+            // Add page context information
+            if (currentPageContext) {
+                prompt += `Page Title: ${currentPageContext.title}\n`;
+                prompt += `Page URL: ${currentPageContext.url}\n`;
+                prompt += `Page Content: ${currentPageContext.content.substring(0, 2000)}...\n\n`;
+            }
+            
+            prompt += `**Image Analysis Task:**
+Analyze the provided images and provide:
+1. **Short description** of what each image shows
+2. **Key visual elements**, colors, and composition
+3. **Any text or data** visible in the images
+4. **Context and relevance** to the page content above
+5. **Notable details or insights** that might be useful
 
-IMPORTANT: Always start with the actual chart values and data points before moving to analysis. Focus only on the visual data in the images.
+**User Question:** ${userMessage}
 
-User request: ${userMessage}`;
+Please provide a comprehensive analysis using both the visual content and the page context.`;
+        } else {
+            // Images only - focused analysis without page context
+            prompt = `You are an AI assistant analyzing images. 
+
+**Image Analysis Task:**
+Analyze the provided images and provide:
+1. **Short description** of what each image shows
+2. **Key visual elements**, colors, and composition  
+3. **Any text or data** visible in the images
+4. **Notable details or insights** that might be useful
+
+**User Question:** ${userMessage}
+
+Please provide a comprehensive analysis focusing on the visual content.`;
+        }
     } else {
         // No images: Use full context prompt
         prompt = createContextPromptTextOnly(userMessage);
@@ -572,15 +614,17 @@ function createContextPromptTextOnly(userMessage) {
         if (currentPageContext.charts && currentPageContext.charts.length > 0) {
             prompt += `Charts/Graphs found on page (${currentPageContext.charts.length}):\n`;
             currentPageContext.charts.forEach((chart, index) => {
-                prompt += `Chart ${chart.id} (${chart.type}): ${chart.description || 'No description'}\n`;
-                if (chart.context) {
-                    prompt += `  Context: ${chart.context}\n`;
-                }
-                if (chart.textContent) {
-                    prompt += `  Content: ${chart.textContent.substring(0, 100)}...\n`;
-                }
-                prompt += '\n';
+                prompt += `- Chart ${index + 1}: ${chart.type} (${chart.width}x${chart.height}) - ${chart.description}\n`;
             });
+            prompt += '\n';
+        }
+
+        if (currentPageContext.images && currentPageContext.images.length > 0) {
+            prompt += `Content Images found on page (${currentPageContext.images.length}):\n`;
+            currentPageContext.images.forEach((image, index) => {
+                prompt += `- Image ${index + 1}: ${image.description} (${image.width}x${image.height}) - ${image.alt}\n`;
+            });
+            prompt += '\n';
         }
     }
     
@@ -635,15 +679,17 @@ async function createContextPrompt(userMessage) {
         if (currentPageContext.charts && currentPageContext.charts.length > 0) {
             prompt += `Charts/Graphs found on page (${currentPageContext.charts.length}):\n`;
             currentPageContext.charts.forEach((chart, index) => {
-                prompt += `Chart ${chart.id} (${chart.type}): ${chart.description || 'No description'}\n`;
-                if (chart.context) {
-                    prompt += `  Context: ${chart.context}\n`;
-                }
-                if (chart.textContent) {
-                    prompt += `  Content: ${chart.textContent.substring(0, 100)}...\n`;
-                }
-                prompt += '\n';
+                prompt += `- Chart ${index + 1}: ${chart.type} (${chart.width}x${chart.height}) - ${chart.description}\n`;
             });
+            prompt += '\n';
+        }
+
+        if (currentPageContext.images && currentPageContext.images.length > 0) {
+            prompt += `Content Images found on page (${currentPageContext.images.length}):\n`;
+            currentPageContext.images.forEach((image, index) => {
+                prompt += `- Image ${index + 1}: ${image.description} (${image.width}x${image.height}) - ${image.alt}\n`;
+            });
+            prompt += '\n';
         }
     }
     
@@ -660,31 +706,22 @@ async function createContextPrompt(userMessage) {
     prompt += `Current user question: ${userMessage}\n\n`;
     prompt += `Please provide a helpful, accurate, and conversational response based on the page content and context. If analyzing tables, provide clear insights about the data. If analyzing charts, describe what the visual elements might represent. If the question is not related to the page content, you can still provide a helpful general response.`;
     
-    // Check if user message indicates they want visual analysis
-    const visualAnalysisKeywords = ['chart', 'graph', 'analyze', 'screenshot', 'visual', 'image', 'plot', 'diagram', 'see', 'show', 'look'];
-    const needsVisualAnalysis = visualAnalysisKeywords.some(keyword => 
-        userMessage.toLowerCase().includes(keyword)
-    );
+    // Always extract images when they exist on the page - let users choose via selection modal
+    console.log('Checking for available images on page');
     
-    const matchedKeywords = visualAnalysisKeywords.filter(keyword => userMessage.toLowerCase().includes(keyword));
-    console.log('User message analysis:', {
-        message: userMessage,
-        needsVisualAnalysis: needsVisualAnalysis,
-        matchedKeywords: matchedKeywords
-    });
-    
-    // Extract all chart screenshots into an array (only if needed)
+    // Extract all chart screenshots into an array
     const images = [];
-
     
-    if (needsVisualAnalysis && currentPageContext && currentPageContext.charts && currentPageContext.charts.length > 0) {
-        console.log('Visual analysis requested - checking for existing screenshots');
+    // Always check for charts and images if they exist on the page
+    if (currentPageContext && (currentPageContext.charts?.length > 0 || currentPageContext.images?.length > 0)) {
+        console.log('Images/charts found on page - checking for screenshots');
         
-        // Check if we already have screenshots
-        const hasScreenshots = currentPageContext.charts.some(chart => chart.screenshot);
+        // Check if we already have screenshots for charts
+        const hasChartScreenshots = currentPageContext.charts?.some(chart => chart.screenshot) || false;
+        const hasImageScreenshots = currentPageContext.images?.some(image => image.screenshot) || false;
         
-        if (!hasScreenshots) {
-            console.log('No screenshots available - capturing now');
+        if (!hasChartScreenshots || !hasImageScreenshots) {
+            console.log('Missing screenshots - capturing now');
             // Capture screenshots on demand
             try {
                 const tabs = await browser.tabs.query({ active: true });
@@ -704,7 +741,8 @@ async function createContextPrompt(userMessage) {
                     if (contentResponse && contentResponse.success) {
                         // Update current context with screenshots
                         currentPageContext.charts = contentResponse.data.charts || [];
-                        console.log('Screenshots captured on demand:', currentPageContext.charts.filter(c => c.screenshot).length);
+                        currentPageContext.images = contentResponse.data.images || [];
+                        console.log('Screenshots captured - Charts:', currentPageContext.charts.filter(c => c.screenshot).length, 'Images:', currentPageContext.images.filter(i => i.screenshot).length);
                     }
                 }
             } catch (error) {
@@ -712,23 +750,39 @@ async function createContextPrompt(userMessage) {
             }
         }
         
-        // Now extract images from charts
-        currentPageContext.charts.forEach(chart => {
-            console.log(`Chart ${chart.id} (${chart.type}):`, {
-                hasScreenshot: !!chart.screenshot,
-                screenshotLength: chart.screenshot ? chart.screenshot.length : 0
-            });
-            if (chart.screenshot) {
-                // Handle both full page screenshots and canvas screenshots
-                if (chart.type === 'fullpage') {
-                    // Full page screenshots already have the data: prefix
-                    images.push(chart.screenshot.split(',')[1]); // Extract base64 part
-                } else if (chart.type === 'canvas') {
-                    // Canvas screenshots have the data: prefix
-                    images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+        // Extract images from charts
+        if (currentPageContext.charts) {
+            currentPageContext.charts.forEach(chart => {
+                console.log(`Chart ${chart.id} (${chart.type}):`, {
+                    hasScreenshot: !!chart.screenshot,
+                    screenshotLength: chart.screenshot ? chart.screenshot.length : 0
+                });
+                if (chart.screenshot) {
+                    // Handle both full page screenshots and canvas screenshots
+                    if (chart.type === 'fullpage') {
+                        // Full page screenshots already have the data: prefix
+                        images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                    } else if (chart.type === 'canvas') {
+                        // Canvas screenshots have the data: prefix
+                        images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        // Extract images from detected content images
+        if (currentPageContext.images) {
+            currentPageContext.images.forEach(image => {
+                console.log(`Image ${image.id} (${image.type}):`, {
+                    hasScreenshot: !!image.screenshot,
+                    screenshotLength: image.screenshot ? image.screenshot.length : 0
+                });
+                if (image.screenshot) {
+                    // Content images have the data: prefix
+                    images.push(image.screenshot.split(',')[1]); // Extract base64 part
+                }
+            });
+        }
     }
     
     console.log('Final images array length:', images.length);
@@ -832,11 +886,16 @@ function addMessage(type, content, images = [], isEditable = false) {
         messageContent.appendChild(imagesContainer);
     }
     
-    // Format content
+    // Format content and append as DOM elements
     if (type === 'error') {
-        messageContent.innerHTML += `<p style="color: #dc3545;">${escapeHtml(content)}</p>`;
+        const errorParagraph = document.createElement('p');
+        errorParagraph.style.color = '#dc3545';
+        errorParagraph.textContent = content; // textContent automatically escapes HTML
+        messageContent.appendChild(errorParagraph);
     } else {
-        messageContent.innerHTML += formatMessageContent(content);
+        // formatMessageContent will now return a DocumentFragment or an element
+        const formattedContent = formatMessageContent(content);
+        messageContent.appendChild(formattedContent);
     }
     
     messageDiv.appendChild(messageContent);
@@ -846,6 +905,273 @@ function addMessage(type, content, images = [], isEditable = false) {
     elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
     
     return messageDiv; // Return the message div for potential removal
+}
+
+// Format message content with markdown rendering, now returning DOM elements
+function formatMessageContent(content) {
+    // The renderMarkdown function will now return a DocumentFragment or a DOM element
+    return renderMarkdown(content);
+}
+
+// Enhanced markdown renderer with direct DOM manipulation
+function renderMarkdown(text) {
+    const fragment = document.createDocumentFragment();
+    const lines = text.split('\n');
+    let inCodeBlock = false;
+    let inList = false;
+    let listType = ''; // 'ul' or 'ol'
+    let currentList = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let trimmedLine = line.trim();
+
+        // Code Block Toggle
+        if (trimmedLine.startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            if (inCodeBlock) {
+                const pre = document.createElement('pre');
+                const code = document.createElement('code');
+                code.className = trimmedLine.substring(3).trim(); // Language hint
+                pre.appendChild(code);
+                fragment.appendChild(pre);
+            } else {
+                // End of code block, next line will be handled as normal
+            }
+            continue; // Skip processing this line further
+        }
+
+        if (inCodeBlock) {
+            const lastPre = fragment.lastChild;
+            if (lastPre && lastPre.tagName === 'PRE') {
+                const code = lastPre.lastChild;
+                if (code && code.tagName === 'CODE') {
+                    code.textContent += line + '\n'; // Add line to code block, preserve newlines
+                }
+            }
+            continue;
+        }
+
+        // Check for tables
+        const tableResult = parseMarkdownTable(lines, i);
+        if (tableResult.htmlElement) {
+            if (inList) { // Close previous list if any
+                inList = false;
+                currentList = null;
+            }
+            fragment.appendChild(tableResult.htmlElement);
+            i = tableResult.nextIndex - 1; // Adjust index to continue after table
+            continue;
+        }
+
+        // Check for lists
+        const isUl = trimmedLine.startsWith('-');
+        const isOl = /^[0-9]+\./.test(trimmedLine);
+
+        if (isUl || isOl) {
+            if (!inList || (isUl && listType !== 'ul') || (isOl && listType !== 'ol')) {
+                // Start a new list or switch list type
+                if (currentList) {
+                    fragment.appendChild(currentList);
+                }
+                listType = isUl ? 'ul' : 'ol';
+                currentList = document.createElement(listType);
+                fragment.appendChild(currentList); // Append the list container now
+                inList = true;
+            }
+
+            const li = document.createElement('li');
+            li.textContent = trimmedLine.substring(trimmedLine.indexOf(' ') + 1);
+            currentList.appendChild(li);
+
+        } else { // Not a list item
+            if (inList) { // Close previous list
+                inList = false;
+                currentList = null;
+            }
+
+            // Headers
+            if (trimmedLine.startsWith('### ')) {
+                const h3 = document.createElement('h3');
+                h3.textContent = trimmedLine.substring(4);
+                fragment.appendChild(h3);
+            } else if (trimmedLine.startsWith('## ')) {
+                const h2 = document.createElement('h2');
+                h2.textContent = trimmedLine.substring(3);
+                fragment.appendChild(h2);
+            } else if (trimmedLine.startsWith('# ')) {
+                const h1 = document.createElement('h1');
+                h1.textContent = trimmedLine.substring(2);
+                fragment.appendChild(h1);
+            } else if (trimmedLine.startsWith('> ')) {
+                const blockquote = document.createElement('blockquote');
+                blockquote.textContent = trimmedLine.substring(2);
+                fragment.appendChild(blockquote);
+            } else if (trimmedLine.length > 0) {
+                // Default to paragraph for remaining content
+                const p = document.createElement('p');
+                // Apply inline markdown for the paragraph content
+                p.appendChild(parseInlineMarkdown(line));
+                fragment.appendChild(p);
+            } else if (line.length === 0) {
+                // Preserve empty lines as <br> or just skip
+                // For simplicity, we can add a <br> for visual spacing or just let the paragraph flow handle it.
+                // For now, let's just add an empty paragraph if there's a significant break
+                if (lines[i-1] && lines[i-1].trim() !== '') {
+                     fragment.appendChild(document.createElement('br'));
+                }
+            }
+        }
+    }
+
+    // Append any unclosed list
+    if (currentList) {
+        fragment.appendChild(currentList);
+    }
+    
+    return fragment;
+}
+
+// Helper to parse inline markdown (bold, italic, links, inline code)
+function parseInlineMarkdown(text) {
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+
+    // Regex for: inline code (`...`), bold (**...**), links ([...](...))
+    const regex = /(`[^`]+`)|(\*{2}[^*]+\*{2})|\[([^\]]+)\]\(([^)]+)\)/g;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        // Add text before the current match
+        if (match.index > lastIndex) {
+            fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+        }
+
+        if (match[1]) { // Inline code
+            const code = document.createElement('code');
+            code.textContent = match[1].substring(1, match[1].length - 1);
+            fragment.appendChild(code);
+        } else if (match[2]) { // Bold
+            const strong = document.createElement('strong');
+            strong.textContent = match[2].substring(2, match[2].length - 2);
+            fragment.appendChild(strong);
+        } else if (match[3] && match[4]) { // Link
+            const a = document.createElement('a');
+            a.href = match[4];
+            a.textContent = match[3];
+            a.target = '_blank'; // Open links in new tab
+            fragment.appendChild(a);
+        }
+        lastIndex = regex.lastIndex;
+    }
+
+    // Add any remaining text after the last match
+    if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+    }
+    return fragment;
+}
+
+// Add some basic styling for tables
+const style = document.createElement('style');
+style.textContent = `
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 14px;
+    border: 1px solid #ccc;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+  }
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+`;
+document.head.appendChild(style);
+
+// Convert markdown tables to HTML DOM elements
+function parseMarkdownTable(lines, startIndex) {
+    const tableLines = [];
+    let i = startIndex;
+
+    console.log('parseMarkdownTable called at line', startIndex, 'content:', lines[startIndex]);
+
+    // First line must contain a pipe to be considered a table header
+    if (!lines[i] || !lines[i].includes('|')) {
+        console.log('No pipe found in first line, returning null');
+        return { htmlElement: null, nextIndex: startIndex };
+    }
+
+    // Second line must be a valid separator - very flexible regex
+    if (!lines[i + 1] || !lines[i + 1].match(/^[ |:-]+$/)) {
+        console.log('Second line does not match separator pattern:', lines[i + 1]);
+        return { htmlElement: null, nextIndex: startIndex };
+    }
+
+    console.log('Table detected! Processing...');
+
+    // Collect all subsequent lines that are part of the table
+    while (i < lines.length && lines[i].includes('|')) {
+        tableLines.push(lines[i]);
+        i++;
+    }
+
+    if (tableLines.length < 2) {
+        console.log('Not enough table lines:', tableLines.length);
+        return { htmlElement: null, nextIndex: startIndex };
+    }
+
+    console.log('Creating table with', tableLines.length, 'lines');
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+
+    // Helper to parse a table row string
+    const parseRow = (rowString) => {
+        // Trim leading/trailing whitespace and pipes, then split
+        return rowString.replace(/^ *\||\| *$/g, '').split('|').map(cell => cell.trim());
+    };
+
+    // Parse header
+    const headerCells = parseRow(tableLines[0]);
+    const headerRow = document.createElement('tr');
+    headerCells.forEach(cellText => {
+        const th = document.createElement('th');
+        th.textContent = cellText;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const columnCount = headerCells.length;
+
+    // Parse data rows (start from index 2, after header and separator)
+    for (let j = 2; j < tableLines.length; j++) {
+        const dataCells = parseRow(tableLines[j]);
+        const dataRow = document.createElement('tr');
+        
+        // Ensure row has the same number of cells as the header
+        for (let k = 0; k < columnCount; k++) {
+            const td = document.createElement('td');
+            td.textContent = dataCells[k] || ''; // Use empty string for missing cells
+            dataRow.appendChild(td);
+        }
+        tbody.appendChild(dataRow);
+    }
+
+    table.appendChild(tbody);
+
+    console.log('Table created successfully');
+    return { htmlElement: table, nextIndex: i };
 }
 
 // Show a modal for managing and removing images
@@ -892,6 +1218,50 @@ function showImageManagerModal(draftMessageDiv) {
         font-size: 14px;
     `;
     modalContent.appendChild(instructions);
+
+    // Page text context option
+    const contextOption = document.createElement('div');
+    contextOption.style.cssText = `
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 15px;
+    `;
+
+    const contextCheckbox = document.createElement('input');
+    contextCheckbox.type = 'checkbox';
+    contextCheckbox.id = 'includePageText';
+    contextCheckbox.checked = true; // Default to checked
+    contextCheckbox.style.cssText = `
+        margin-right: 8px;
+        transform: scale(1.1);
+    `;
+
+    const contextLabel = document.createElement('label');
+    contextLabel.htmlFor = 'includePageText';
+    contextLabel.textContent = '📄 Include page text content as context for image analysis';
+    contextLabel.style.cssText = `
+        font-weight: 500;
+        color: #495057;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+    `;
+
+    const contextDescription = document.createElement('p');
+    contextDescription.textContent = 'This helps the AI understand the images better by providing the surrounding page content.';
+    contextDescription.style.cssText = `
+        margin: 8px 0 0 24px;
+        font-size: 12px;
+        color: #6c757d;
+        line-height: 1.4;
+    `;
+
+    contextLabel.insertBefore(contextCheckbox, contextLabel.firstChild);
+    contextOption.appendChild(contextLabel);
+    contextOption.appendChild(contextDescription);
+    modalContent.appendChild(contextOption);
 
     // Image grid
     const imageGrid = document.createElement('div');
@@ -1033,15 +1403,24 @@ function showImageManagerModal(draftMessageDiv) {
     applyBtn.onclick = () => {
         // Get selected images
         const selectedImages = [];
-        const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach((cb, index) => {
+        const imageCheckboxes = modal.querySelectorAll('input[type="checkbox"]:not(#includePageText)');
+        imageCheckboxes.forEach((cb, index) => {
             if (cb.checked) {
                 selectedImages.push(allImages[index]);
             }
         });
         
+        // Get page text context option
+        const includePageText = modal.querySelector('#includePageText').checked;
+        
+        // Store the page text option in the draft message for later use
+        draftMessageDiv.dataset.includePageText = includePageText;
+        
         // Update the draft message to show only selected images
         updateDraftMessageImages(draftMessageDiv, selectedImages);
+        
+        // Update the draft message to show page text context status
+        updateDraftMessageContext(draftMessageDiv, includePageText);
         
         // Close modal
         document.body.removeChild(modal);
@@ -1054,6 +1433,38 @@ function showImageManagerModal(draftMessageDiv) {
 
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
+}
+
+// Helper function to update draft message with page text context status
+function updateDraftMessageContext(draftMessageDiv, includePageText) {
+    // Find or create context status indicator
+    let contextIndicator = draftMessageDiv.querySelector('.context-indicator');
+    
+    if (!contextIndicator) {
+        contextIndicator = document.createElement('div');
+        contextIndicator.className = 'context-indicator';
+        contextIndicator.style.cssText = `
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        `;
+        
+        // Insert at the top of message content
+        const messageContent = draftMessageDiv.querySelector('.message-content');
+        messageContent.insertBefore(contextIndicator, messageContent.firstChild);
+    }
+    
+    if (includePageText) {
+        contextIndicator.textContent = '📄 Page text context included for better image analysis';
+        contextIndicator.style.display = 'block';
+    } else {
+        contextIndicator.textContent = '🖼️ Image-only analysis (no page context)';
+        contextIndicator.style.display = 'block';
+    }
 }
 
 // Helper function to update draft message with selected images
@@ -1130,165 +1541,6 @@ function updateDraftMessageImages(draftMessageDiv, selectedImages) {
             imagesContainer.style.display = 'flex';
         }
     }
-}
-
-// Format message content with markdown rendering
-function formatMessageContent(content) {
-    // First escape HTML to prevent XSS
-    let html = escapeHtml(content);
-    
-    // Apply markdown formatting
-    html = renderMarkdown(html);
-    
-    return html;
-}
-
-// Enhanced markdown renderer with table support
-function renderMarkdown(text) {
-    // Convert code blocks first (to avoid conflicts with other patterns)
-    text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    
-    // Convert inline code
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
-    // Convert markdown tables
-    text = convertMarkdownTables(text);
-    
-    // Convert headers
-    text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
-    text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
-    text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
-    
-    // Convert bold text
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // Convert italic text - removing single asterisks
-    text = text.replace(/\*(.*?)\*/g, '$1');
-    
-    // Convert links
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-    
-    // Convert blockquotes
-    text = text.replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>');
-    
-    // Convert unordered lists
-    text = text.replace(/^- (.*$)/gm, '<li>$1</li>');
-    text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-    
-    // Convert ordered lists
-    text = text.replace(/^\d+\. (.*$)/gm, '<li>$1</li>');
-    
-    // Convert line breaks (but preserve existing HTML)
-    text = text.replace(/\n/g, '<br>');
-    
-    return text;
-}
-
-// Convert markdown tables to HTML
-function convertMarkdownTables(text) {
-    // Split text into lines
-    const lines = text.split('\n');
-    let result = [];
-    let i = 0;
-    
-    while (i < lines.length) {
-        const line = lines[i].trim();
-        
-        // Check if this line looks like a table header (contains |)
-        if (line.includes('|') && line.split('|').length > 2) {
-            // Look for separator line (next line should contain dashes and pipes)
-            if (i + 1 < lines.length) {
-                const nextLine = lines[i + 1].trim();
-                if (nextLine.includes('|') && nextLine.includes('-')) {
-                    // This is a markdown table
-                    const tableResult = parseMarkdownTable(lines, i);
-                    result.push(tableResult.html);
-                    i = tableResult.nextIndex;
-                    continue;
-                }
-            }
-        }
-        
-        result.push(lines[i]);
-        i++;
-    }
-    
-    return result.join('\n');
-}
-
-// Parse a markdown table starting at the given index
-function parseMarkdownTable(lines, startIndex) {
-    let i = startIndex;
-    const tableLines = [];
-    
-    // Collect all table lines
-    while (i < lines.length) {
-        const line = lines[i].trim();
-        if (line.includes('|')) {
-            tableLines.push(line);
-            i++;
-        } else {
-            break;
-        }
-    }
-    
-    if (tableLines.length < 2) {
-        return { html: lines[startIndex], nextIndex: startIndex + 1 };
-    }
-    
-    // Parse header
-    const headerCells = tableLines[0].split('|').map(cell => cell.trim()).filter(cell => cell);
-    
-    // Skip separator line (index 1)
-    
-    // Parse data rows
-    const dataRows = [];
-    for (let j = 2; j < tableLines.length; j++) {
-        const cells = tableLines[j].split('|').map(cell => cell.trim()).filter(cell => cell);
-        if (cells.length > 0) {
-            dataRows.push(cells);
-        }
-    }
-    
-    // Generate HTML table
-    let html = '<table>';
-    
-    // Header
-    if (headerCells.length > 0) {
-        html += '<thead><tr>';
-        headerCells.forEach(cell => {
-            html += `<th>${cell}</th>`;
-        });
-        html += '</tr></thead>';
-    }
-    
-    // Body
-    if (dataRows.length > 0) {
-        html += '<tbody>';
-        dataRows.forEach(row => {
-            html += '<tr>';
-            row.forEach((cell, index) => {
-                html += `<td>${cell || ''}</td>`;
-            });
-            // Fill empty cells if row is shorter than header
-            for (let k = row.length; k < headerCells.length; k++) {
-                html += '<td></td>';
-            }
-            html += '</tr>';
-        });
-        html += '</tbody>';
-    }
-    
-    html += '</table>';
-    
-    return { html, nextIndex: i };
-}
-
-// Escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 // Copy to clipboard
@@ -1625,13 +1877,16 @@ async function loadMultiTabContext(tabIds) {
                         url: contentResponse.data.url,
                         content: contentResponse.data.textContent,
                         tables: contentResponse.data.tables || [],
-                        charts: contentResponse.data.charts || []
+                        charts: contentResponse.data.charts || [],
+                        images: contentResponse.data.images || [],
+                        estimatedTokens: Math.ceil(contentResponse.data.textContent.split(/\s+/).length * TOKEN_ESTIMATION_FACTOR)
                     });
                 } else {
                     // Content script might not be injected, try to inject it
                     try {
-                        await browser.tabs.executeScript(tabId, {
-                            file: 'content-script.js'
+                        await browser.scripting.executeScript({
+                            target: { tabId: tabId },
+                            files: ['content-script.js']
                         });
                         
                         // Wait a bit for script to load
@@ -1650,7 +1905,9 @@ async function loadMultiTabContext(tabIds) {
                                 url: retryResponse.data.url,
                                 content: retryResponse.data.textContent,
                                 tables: retryResponse.data.tables || [],
-                                charts: retryResponse.data.charts || []
+                                charts: retryResponse.data.charts || [],
+                                images: retryResponse.data.images || [],
+                                estimatedTokens: Math.ceil(retryResponse.data.textContent.split(/\s+/).length * TOKEN_ESTIMATION_FACTOR)
                             });
                         } else {
                             console.warn(`Could not extract content from tab ${tabId}: ${tab.title}`);
@@ -1679,8 +1936,10 @@ async function loadMultiTabContext(tabIds) {
             content: tabContexts.map(ctx => `--- ${ctx.title} ---\n${ctx.content}`).join('\n\n'),
             tables: tabContexts.flatMap(ctx => ctx.tables),
             charts: tabContexts.flatMap(ctx => ctx.charts),
+            images: tabContexts.flatMap(ctx => ctx.images),
             multiTab: true,
-            tabContexts: tabContexts
+            tabContexts: tabContexts,
+            estimatedTokens: tabContexts.reduce((sum, ctx) => sum + ctx.estimatedTokens, 0)
         };
         
         // Update UI
@@ -1696,20 +1955,45 @@ async function loadMultiTabContext(tabIds) {
 
 // Update context display in UI
 function updateContextDisplay() {
-    if (currentPageContext.multiTab) {
-        elements.pageTitle.textContent = currentPageContext.title;
-        elements.pageUrl.textContent = currentPageContext.url;
-        
-        // Show which tabs are selected
-        const tabList = currentPageContext.tabContexts
-            .map(ctx => `• ${ctx.title}`)
-            .join('\n');
-        
-        console.log('Selected tabs:\n' + tabList);
-    } else {
-        elements.pageTitle.textContent = currentPageContext.title;
-        elements.pageUrl.textContent = currentPageContext.url;
+    let contextInfo = '';
+    let estimatedTokens = 0;
+
+    if (currentContext && currentContext.content) {
+        if (selectedTabsData.length > 1) {
+            // Multi-tab context
+            const titles = selectedTabsData.map(tab => tab.title).join(', ');
+            const urls = selectedTabsData.map(tab => new URL(tab.url).hostname).join(', ');
+            contextInfo = `Context from: ${titles} (${urls})`;
+            estimatedTokens = currentContext.estimatedTokens;
+        } else if (currentPageContext && currentPageContext.content) {
+            // Single-tab context
+            contextInfo = `Context from: ${currentPageContext.title} (${new URL(currentPageContext.url).hostname})`;
+            estimatedTokens = Math.ceil(currentPageContext.content.split(/\s+/).length * TOKEN_ESTIMATION_FACTOR);
+        }
     }
+
+    elements.pageTitle.textContent = contextInfo || 'No context loaded';
+    elements.pageUrl.textContent = ''; // Clear URL for better display with combined context
+
+    // Update message input with token info and warning if applicable
+    let tokenMessage = `Estimated tokens: ${estimatedTokens}`; 
+    if (estimatedTokens > MAX_TOKEN_LIMIT) {
+        tokenMessage += ` (Warning: Above ${MAX_TOKEN_LIMIT} tokens, accuracy may be lower)`;
+        elements.messageInput.style.borderColor = 'red'; // Visual cue for warning
+    } else {
+        elements.messageInput.style.borderColor = ''; // Reset border color
+    }
+    
+    // Prepend token message to the input field if it's currently empty or only contains whitespace
+    if (elements.messageInput.value.trim() === '' || elements.messageInput.value.startsWith('Estimated tokens:')) {
+        elements.messageInput.value = tokenMessage + '\n\n';
+    } else {
+        // If user has already typed, just update the tooltip/placeholder or a separate info area if needed
+        // For now, let's just make sure the warning is visible
+        console.log(tokenMessage); // Log to console for now if input has user text
+    }
+
+    handleInputChange(); // Adjust textarea height and send button state
 }
 
 // Export chat functionality
@@ -1762,42 +2046,69 @@ function showExportModal(markdownContent) {
     // Create modal overlay
     const modal = document.createElement('div');
     modal.className = 'export-modal';
-    modal.innerHTML = `
-        <div class="export-modal-content">
-            <div class="export-modal-header">
-                <h3>Export Chat as Markdown</h3>
-                <button class="export-modal-close">&times;</button>
-            </div>
-            <div class="export-modal-body">
-                <div class="export-options">
-                    <button id="copyMarkdown" class="export-option-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                        Copy to Clipboard
-                    </button>
-                    <button id="downloadMarkdown" class="export-option-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7,10 12,15 17,10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        Download File
-                    </button>
-                </div>
-                <textarea class="export-preview" readonly>${markdownContent}</textarea>
-            </div>
-        </div>
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'export-modal-content';
+
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'export-modal-header';
+
+    const headerTitle = document.createElement('h3');
+    headerTitle.textContent = 'Export Chat as Markdown';
+    modalHeader.appendChild(headerTitle);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'export-modal-close';
+    closeBtn.innerHTML = '&times;'; // Using innerHTML for a simple HTML entity is generally acceptable
+    modalHeader.appendChild(closeBtn);
+
+    modalContent.appendChild(modalHeader);
+
+    const modalBody = document.createElement('div');
+    modalBody.className = 'export-modal-body';
+
+    const exportOptions = document.createElement('div');
+    exportOptions.className = 'export-options';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.id = 'copyMarkdown';
+    copyBtn.className = 'export-option-btn';
+    copyBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        Copy to Clipboard
     `;
-    
+    exportOptions.appendChild(copyBtn);
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.id = 'downloadMarkdown';
+    downloadBtn.className = 'export-option-btn';
+    downloadBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7,10 12,15 17,10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download File
+    `;
+    exportOptions.appendChild(downloadBtn);
+
+    modalBody.appendChild(exportOptions);
+
+    const previewTextarea = document.createElement('textarea');
+    previewTextarea.className = 'export-preview';
+    previewTextarea.readOnly = true;
+    previewTextarea.value = markdownContent;
+    modalBody.appendChild(previewTextarea);
+
+    modalContent.appendChild(modalBody);
+    modal.appendChild(modalContent);
+
     document.body.appendChild(modal);
     
     // Event handlers
-    const closeBtn = modal.querySelector('.export-modal-close');
-    const copyBtn = modal.querySelector('#copyMarkdown');
-    const downloadBtn = modal.querySelector('#downloadMarkdown');
-    
     closeBtn.addEventListener('click', () => {
         document.body.removeChild(modal);
     });
@@ -1863,35 +2174,6 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         let prompt = '';
         
         switch (message.menuItemId) {
-            case 'ai-chat':
-                // Only populate if there's selected text, otherwise leave input clean
-                prompt = message.selectedText ? 
-                    `Please explain this selected text: "${message.selectedText}"` :
-                    '';
-                break;
-                
-            case 'fact-check':
-                prompt = message.selectedText ? 
-                    `Please fact-check this statement: "${message.selectedText}"` :
-                    'Please fact-check the main claims on this page';
-                break;
-                
-            case 'extract-tables':
-                prompt = 'Please extract and analyze all tables on this page. Format them clearly and explain what they show.';
-                break;
-                
-            case 'financial-analysis':
-                prompt = message.selectedText ? 
-                    `Please provide a quick financial analysis of this data: "${message.selectedText}"` :
-                    'Please provide a quick financial analysis of this page content';
-                break;
-                
-            case 'chart-analysis':
-                prompt = message.selectedText ? 
-                    `Please analyze this chart/graph data: "${message.selectedText}"` :
-                    'Please analyze any charts, graphs, or visual data on this page';
-                break;
-                
             case 'summarize-page':
                 prompt = 'Please summarize this page.';
                 break;
@@ -1902,28 +2184,22 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     'Please provide a quick summary of this page.';
                 break;
 
+            case 'find-key-information':
+                prompt = message.selectedText ? 
+                    `What are the most important details I should know from this selected text: "${message.selectedText}"` :
+                    'What are the most important details I should know from this page?';
+                break;
+
             case 'main-points':
                 prompt = message.selectedText ? 
                     `What are the main points of this selected text in bullet points: "${message.selectedText}"` :
                     'What are the main points of this page in bullet points?';
                 break;
 
-            case 'explain-further':
+            case 'take-notes':
                 prompt = message.selectedText ? 
-                    `Please explain this topic further and provide background information based on: "${message.selectedText}"` :
-                    'Please explain this topic further, and give me background information based on the page content.';
-                break;
-
-            case 'ask-questions':
-                prompt = message.selectedText ? 
-                    `What questions should I ask about this selected text: "${message.selectedText}"` :
-                    'What questions should I ask about this page content?';
-                break;
-                
-            case 'study-questions':
-                prompt = message.selectedText ? 
-                    `Please generate study questions and flashcards based on this selected text: "${message.selectedText}"` :
-                    'Please generate study questions and flashcards based on this page content';
+                    `Help me create organized notes from this selected text: "${message.selectedText}"` :
+                    'Help me create organized notes from this content';
                 break;
         }
         

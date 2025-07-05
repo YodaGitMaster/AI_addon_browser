@@ -110,6 +110,14 @@ function createContextMenus() {
             contexts: ['page', 'selection']
         });
 
+        // Find Key Information
+        browser.contextMenus.create({
+            id: 'find-key-information',
+            parentId: 'ai-analysis',
+            title: 'Find Key Information',
+            contexts: ['page', 'selection']
+        });
+
         // Main Points
         browser.contextMenus.create({
             id: 'main-points',
@@ -118,27 +126,11 @@ function createContextMenus() {
             contexts: ['page', 'selection']
         });
 
-        // Explain Further
+        // Take Notes
         browser.contextMenus.create({
-            id: 'explain-further',
+            id: 'take-notes',
             parentId: 'ai-analysis',
-            title: 'Explain this topic further, and give me background information',
-            contexts: ['page', 'selection']
-        });
-
-        // Ask Questions
-        browser.contextMenus.create({
-            id: 'ask-questions',
-            parentId: 'ai-analysis',
-            title: 'What questions should I ask about this?',
-            contexts: ['page', 'selection']
-        });
-        
-        // Study questions
-        browser.contextMenus.create({
-            id: 'study-questions',
-            parentId: 'ai-analysis',
-            title: 'Generate Study Questions',
+            title: 'Take Notes',
             contexts: ['page', 'selection']
         });
     });

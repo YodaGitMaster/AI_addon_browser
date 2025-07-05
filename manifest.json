@@ -7,7 +7,8 @@
         "activeTab",
         "tabs",
         "storage",
-        "contextMenus"
+        "contextMenus",
+        "scripting"
     ],
     "host_permissions": [
         "http://localhost:11434/*"
@@ -35,6 +36,11 @@
         "scripts": [
             "background.js"
         ]
+    },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "ai_page_summarizer@example.com"
+        }
     },
     "icons": {
         "16": "icons/icon-16.png",
