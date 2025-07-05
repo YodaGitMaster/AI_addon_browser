@@ -2,6 +2,25 @@
 
 ## Key Discoveries
 
+### 2024-12-19 Enhanced Trading Analysis Implementation
+- **Evolution**: Improved trading prompt from dry recommendations to engaging analysis
+- **Structure**: 4-part analysis format (Chart Commentary → Technical Analysis → Market Outlook → Recommendation)
+- **Enhancement**: Added chart commentary and technical explanation before recommendation
+- **Balance**: Informative and engaging while maintaining focus on image-only analysis
+- **Implementation**: Modified `callOllamaAPIWithImages` with enhanced prompt structure
+- **Context Elimination**: Still removes page text, tables, charts, and chat history when images sent
+- **Key Learning**: Structured prompts with clear sections improve AI response quality
+- **Impact**: More professional and informative trading analysis while staying focused
+
+### 2024-12-19 Image Removal Bug Resolution
+- **Problem**: Image removal modal couldn't find images to remove
+- **Root Cause**: CSS selector `.images-container .image-wrapper` failed because `image-wrapper` class was missing
+- **Investigation**: Code review revealed imageWrapper div created without CSS class assignment
+- **Resolution**: Added `imageWrapper.className = 'image-wrapper';` to line 725 in sidebar.js
+- **Key Learning**: CSS selector bugs cause silent failures - DOM manipulation appears to work but has no effect
+- **Impact**: Image removal system now functional - users can remove images before sending to API
+- **Debugging Value**: Comprehensive logging helped identify the issue wasn't in event handling but in element selection
+
 ### 2024-12-19 Markdown Visualization & Export Feature
 - **Feature**: Added comprehensive markdown rendering and export functionality
 - **Rendering**: AI responses now display with proper formatting (headers, code blocks, lists, links, etc.)

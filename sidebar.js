@@ -4,14 +4,26 @@ console.log('AI Page Chat sidebar loaded');
 // Configuration
 const OLLAMA_CONFIG = {
     baseUrl: 'http://localhost:11434',
-    model: 'gemma3:latest',
-    timeout: 30000
+    model: 'gemma3:4b',
+    timeout: 120000 // Increase timeout to 2 minutes for image processing
 };
 
 // Global variables
 let currentPageContext = null;
 let chatHistory = [];
 let isProcessing = false;
+
+// State management functions
+function clearPendingState() {
+    window.pendingImages = [];
+    console.log('Cleared pending state');
+}
+
+function initializePendingState() {
+    if (!window.pendingImages) {
+        window.pendingImages = [];
+    }
+}
 
 // DOM elements
 const elements = {
@@ -29,6 +41,9 @@ const elements = {
 // Initialize sidebar
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Sidebar initialized');
+    
+    // Initialize clean state
+    clearPendingState();
     
     // Check Ollama status
     await checkOllamaStatus();
@@ -108,8 +123,8 @@ async function loadPageContext() {
         if (webTabs.length > 0) {
             const tab = webTabs[0];
             
-            // Get page content
-            const contentResponse = await browser.tabs.sendMessage(tab.id, { action: 'extractContent' });
+            // Get page content (without screenshots initially)
+            const contentResponse = await browser.tabs.sendMessage(tab.id, { action: 'extractContent', includeScreenshots: false });
             
             if (contentResponse && contentResponse.success) {
                 currentPageContext = {
@@ -144,7 +159,7 @@ async function loadPageContext() {
                 // Use the most recently accessed tab
                 const tab = browserTabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
                 
-                const contentResponse = await browser.tabs.sendMessage(tab.id, { action: 'extractContent' });
+                const contentResponse = await browser.tabs.sendMessage(tab.id, { action: 'extractContent', includeScreenshots: false });
                 
                 if (contentResponse && contentResponse.success) {
                     currentPageContext = {
@@ -223,25 +238,142 @@ function handleKeyDown(e) {
     }
 }
 
-// Handle sending message
+// Handle send message
 async function handleSendMessage() {
-    if (isProcessing || !elements.messageInput.value.trim()) return;
-    
     const userMessage = elements.messageInput.value.trim();
-    
-    // Add user message to chat
-    addMessage('user', userMessage);
-    
-    // Clear input
-    elements.messageInput.value = '';
-    handleInputChange();
-    
-    // Show typing indicator
-    showTypingIndicator();
+    if (!userMessage || isProcessing) return;
+
+    try {
+        // Clear any previous pending state first
+        clearPendingState();
+        
+        // Clear input first
+        elements.messageInput.value = '';
+        handleInputChange();
+
+        // Get context and images before sending
+        const { prompt, images } = await createContextPrompt(userMessage);
+        const displayImages = images.map(img => `data:image/png;base64,${img}`);
+
+        // Store images globally for removal functionality
+        window.pendingImages = [...displayImages];
+
+        // Show draft message with removable images
+        const draftMessageDiv = addMessage('user', userMessage, window.pendingImages, true);
+        
+        // Add send confirmation buttons if there are images
+        if (window.pendingImages.length > 0) {
+            const confirmContainer = document.createElement('div');
+            confirmContainer.style.cssText = `
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+                justify-content: flex-end;
+            `;
+            
+            const sendButton = document.createElement('button');
+            sendButton.textContent = 'Send';
+            sendButton.style.cssText = `
+                background: #28a745; /* Green */
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+
+            const manageButton = document.createElement('button');
+            manageButton.textContent = 'Manage Images';
+            manageButton.style.cssText = `
+                background: #ffc107; /* Yellow */
+                color: black;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.style.cssText = `
+                background: #dc3545;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            
+            manageButton.onclick = () => {
+                showImageManagerModal(draftMessageDiv);
+            };
+
+            sendButton.onclick = () => {
+                // Now, Send always reads the current images from the draft message
+                const currentImageElements = draftMessageDiv.querySelectorAll('.images-container img');
+                const currentImages = Array.from(currentImageElements).map(img => img.src);
+                
+                console.log('Sending message with', currentImages.length, 'images.');
+
+                draftMessageDiv.remove(); // Remove the entire draft message
+                sendMessageWithImages(userMessage, currentImages);
+            };
+            
+            cancelButton.onclick = () => {
+                draftMessageDiv.remove();
+                clearPendingState(); // Clear global state
+                elements.messageInput.value = userMessage; // Restore message
+                handleInputChange();
+            };
+            
+            confirmContainer.appendChild(manageButton);
+            confirmContainer.appendChild(sendButton);
+            confirmContainer.appendChild(cancelButton);
+            
+            draftMessageDiv.querySelector('.message-content').appendChild(confirmContainer);
+        } else {
+            // No images, just send the message directly
+            sendMessageWithImages(userMessage, []);
+        }
+        
+    } catch (error) {
+        addMessage('error', 'An unexpected error occurred. Please try again.');
+        console.error('Error preparing message:', error);
+    }
+}
+
+// Send message with specified images
+async function sendMessageWithImages(userMessage, selectedImages) {
+    console.log('=== SEND MESSAGE WITH IMAGES DEBUG ===');
+    console.log('Function called with selectedImages length:', selectedImages.length);
+    console.log('selectedImages preview:', selectedImages.map((img, i) => i + ': ' + img.substring(0, 30) + '...'));
+    console.log('=== END SEND MESSAGE DEBUG ===');
     
     try {
-        // Get AI response
-        const response = await callOllamaAPI(userMessage);
+        // Remove the draft message
+        const draftMessages = document.querySelectorAll('.user-message');
+        const lastDraft = draftMessages[draftMessages.length - 1];
+        if (lastDraft && lastDraft.querySelector('button')) {
+            lastDraft.remove();
+        }
+        
+        // Clear pending state since we're now sending
+        clearPendingState();
+        
+        // Add final user message
+        addMessage('user', userMessage, selectedImages);
+        
+        // Show typing indicator
+        showTypingIndicator();
+        
+        // Prepare images for API (remove data: prefix)
+        const apiImages = selectedImages.map(img => img.split(',')[1]);
+        
+        // Call Ollama API with selected images
+        const response = await callOllamaAPIWithImages(userMessage, apiImages);
         
         // Remove typing indicator
         hideTypingIndicator();
@@ -269,14 +401,51 @@ async function handleSendMessage() {
     }
 }
 
-// Call Ollama API
-async function callOllamaAPI(userMessage) {
-    // Create context-aware prompt
-    const contextPrompt = createContextPrompt(userMessage);
+// Call Ollama API with specific images
+async function callOllamaAPIWithImages(userMessage, images) {
+    // Create different prompts based on whether images are present
+    let prompt;
     
+    if (images.length > 0) {
+        // Image-only context: Focus on trading analysis with commentary
+        prompt = `You are a professional trading analyst. Analyze the charts/graphs in the provided images and provide:
+
+1. **Chart Commentary**: Brief description of what you see in the chart (price action, patterns, key levels)
+2. **Technical Analysis**: Explain the current trend, support/resistance levels, and any notable patterns or indicators
+3. **Market Outlook**: Quick assessment of the overall direction (bullish/bearish/sideways)
+4. **Recommendation**: Clear BUY or SELL recommendation with brief reasoning
+
+Keep your response focused, informative, and actionable. Focus only on the visual data in the images.
+
+User request: ${userMessage}`;
+    } else {
+        // No images: Use full context prompt
+        prompt = createContextPromptTextOnly(userMessage);
+    }
+    
+    console.log('Calling Ollama API with:', {
+        promptType: images.length > 0 ? 'ENHANCED TRADING ANALYSIS' : 'FULL CONTEXT',
+        promptLength: prompt.length,
+        imagesCount: images.length,
+        hasImages: images.length > 0,
+        imagesSample: images.length > 0 ? images[0].substring(0, 50) + '...' : 'No images'
+    });
+    
+    // Construct the messages array for the multimodal model using Ollama's format
+    const message = {
+        role: 'user',
+        content: prompt
+    };
+    
+    // Add images to the message if available (Ollama format)
+    if (images.length > 0) {
+        message.images = images;
+        console.log('Added images to message:', images.length);
+    }
+
     const requestBody = {
         model: OLLAMA_CONFIG.model,
-        prompt: contextPrompt,
+        messages: [message],
         stream: false,
         options: {
             temperature: 0.7,
@@ -284,8 +453,16 @@ async function callOllamaAPI(userMessage) {
         }
     };
 
+    console.log('Request body structure:', {
+        model: requestBody.model,
+        messagesCount: requestBody.messages.length,
+        hasImages: !!requestBody.messages[0].images,
+        imagesCount: requestBody.messages[0].images ? requestBody.messages[0].images.length : 0
+    });
+
     try {
-        const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/generate`, {
+        // Use /api/chat endpoint for multimodal support
+        const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -294,14 +471,23 @@ async function callOllamaAPI(userMessage) {
             signal: AbortSignal.timeout(OLLAMA_CONFIG.timeout)
         });
 
+        console.log('API response status:', response.status);
+        
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API error response:', errorText);
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('API response received:', {
+            hasContent: !!data.message?.content,
+            contentLength: data.message?.content?.length || 0
+        });
+        
         return {
             success: true,
-            response: data.response,
+            response: data.message.content,
             model: data.model
         };
 
@@ -313,6 +499,8 @@ async function callOllamaAPI(userMessage) {
             errorMessage = 'Could not connect to Ollama. Please ensure it is running with CORS enabled.';
         } else if (error.message.includes('HTTP error! status: 403')) {
             errorMessage = `Ollama server denied the request. Please restart Ollama with: $env:OLLAMA_ORIGINS='*'; ollama serve`;
+        } else if (error.message.includes('HTTP error! status: 400')) {
+            errorMessage = 'Bad request to Ollama. Please ensure you are using a multimodal model like llava for image analysis.';
         }
         
         return {
@@ -322,8 +510,8 @@ async function callOllamaAPI(userMessage) {
     }
 }
 
-// Create context-aware prompt
-function createContextPrompt(userMessage) {
+// Create context-aware prompt without images (text only)
+function createContextPromptTextOnly(userMessage) {
     let prompt = `You are an AI assistant helping to discuss and analyze web page content. Here's the context:\n\n`;
     
     // Add page context
@@ -385,16 +573,151 @@ function createContextPrompt(userMessage) {
     return prompt;
 }
 
+// Create context-aware prompt (with images)
+async function createContextPrompt(userMessage) {
+    let prompt = `You are an AI assistant helping to discuss and analyze web page content. Here's the context:\n\n`;
+    
+    // Add page context
+    if (currentPageContext) {
+        prompt += `Page Title: ${currentPageContext.title}\n`;
+        prompt += `Page URL: ${currentPageContext.url}\n`;
+        prompt += `Page Content: ${currentPageContext.content.substring(0, 3000)}...\n\n`;
+        
+        // Add table information if available
+        if (currentPageContext.tables && currentPageContext.tables.length > 0) {
+            prompt += `Tables found on page (${currentPageContext.tables.length}):\n`;
+            currentPageContext.tables.forEach((table, index) => {
+                prompt += `Table ${table.id}: ${table.caption || 'No caption'}\n`;
+                if (table.headers.length > 0) {
+                    prompt += `  Headers: ${table.headers.join(', ')}\n`;
+                }
+                prompt += `  Rows: ${table.rows.length}\n`;
+                
+                // Include first few rows as sample data
+                if (table.rows.length > 0) {
+                    prompt += `  Sample data:\n`;
+                    table.rows.slice(0, 3).forEach(row => {
+                        prompt += `    ${row.join(' | ')}\n`;
+                    });
+                }
+                prompt += '\n';
+            });
+        }
+        
+        // Add chart information if available
+        if (currentPageContext.charts && currentPageContext.charts.length > 0) {
+            prompt += `Charts/Graphs found on page (${currentPageContext.charts.length}):\n`;
+            currentPageContext.charts.forEach((chart, index) => {
+                prompt += `Chart ${chart.id} (${chart.type}): ${chart.description || 'No description'}\n`;
+                if (chart.context) {
+                    prompt += `  Context: ${chart.context}\n`;
+                }
+                if (chart.textContent) {
+                    prompt += `  Content: ${chart.textContent.substring(0, 100)}...\n`;
+                }
+                prompt += '\n';
+            });
+        }
+    }
+    
+    // Add recent chat history for context
+    if (chatHistory.length > 0) {
+        prompt += `Previous conversation:\n`;
+        const recentHistory = chatHistory.slice(-3); // Last 3 exchanges
+        recentHistory.forEach(exchange => {
+            prompt += `User: ${exchange.user}\n`;
+            prompt += `Assistant: ${exchange.ai}\n\n`;
+        });
+    }
+    
+    prompt += `Current user question: ${userMessage}\n\n`;
+    prompt += `Please provide a helpful, accurate, and conversational response based on the page content and context. If analyzing tables, provide clear insights about the data. If analyzing charts, describe what the visual elements might represent. If the question is not related to the page content, you can still provide a helpful general response.`;
+    
+    // Check if user message indicates they want visual analysis
+    const visualAnalysisKeywords = ['chart', 'graph', 'analyze', 'screenshot', 'visual', 'image', 'plot', 'diagram', 'see', 'show', 'look'];
+    const needsVisualAnalysis = visualAnalysisKeywords.some(keyword => 
+        userMessage.toLowerCase().includes(keyword)
+    );
+    
+    const matchedKeywords = visualAnalysisKeywords.filter(keyword => userMessage.toLowerCase().includes(keyword));
+    console.log('User message analysis:', {
+        message: userMessage,
+        needsVisualAnalysis: needsVisualAnalysis,
+        matchedKeywords: matchedKeywords
+    });
+    
+    // Extract all chart screenshots into an array (only if needed)
+    const images = [];
+
+    
+    if (needsVisualAnalysis && currentPageContext && currentPageContext.charts && currentPageContext.charts.length > 0) {
+        console.log('Visual analysis requested - checking for existing screenshots');
+        
+        // Check if we already have screenshots
+        const hasScreenshots = currentPageContext.charts.some(chart => chart.screenshot);
+        
+        if (!hasScreenshots) {
+            console.log('No screenshots available - capturing now');
+            // Capture screenshots on demand
+            try {
+                const tabs = await browser.tabs.query({ active: true });
+                const webTabs = tabs.filter(tab => 
+                    !tab.url.startsWith('moz-extension://') && 
+                    !tab.url.startsWith('chrome-extension://') &&
+                    !tab.url.startsWith('about:') &&
+                    tab.url.startsWith('http')
+                );
+                
+                if (webTabs.length > 0) {
+                    const contentResponse = await browser.tabs.sendMessage(webTabs[0].id, { 
+                        action: 'extractContent', 
+                        includeScreenshots: true 
+                    });
+                    
+                    if (contentResponse && contentResponse.success) {
+                        // Update current context with screenshots
+                        currentPageContext.charts = contentResponse.data.charts || [];
+                        console.log('Screenshots captured on demand:', currentPageContext.charts.filter(c => c.screenshot).length);
+                    }
+                }
+            } catch (error) {
+                console.error('Error capturing screenshots on demand:', error);
+            }
+        }
+        
+        // Now extract images from charts
+        currentPageContext.charts.forEach(chart => {
+            console.log(`Chart ${chart.id} (${chart.type}):`, {
+                hasScreenshot: !!chart.screenshot,
+                screenshotLength: chart.screenshot ? chart.screenshot.length : 0
+            });
+            if (chart.screenshot) {
+                // Handle both full page screenshots and canvas screenshots
+                if (chart.type === 'fullpage') {
+                    // Full page screenshots already have the data: prefix
+                    images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                } else if (chart.type === 'canvas') {
+                    // Canvas screenshots have the data: prefix
+                    images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                }
+            }
+        });
+    }
+    
+    console.log('Final images array length:', images.length);
+    return { prompt, images };
+}
+
 // Add message to chat
-function addMessage(type, content) {
+function addMessage(type, content, images = [], isEditable = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
     
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
     
-    // Add copy button for AI and user messages
-    if (type === 'ai' || type === 'user') {
+    // Add copy button for AI and user messages (but not drafts)
+    if ((type === 'ai' || type === 'user') && !isEditable) {
         const copyButton = document.createElement('button');
         copyButton.className = 'copy-button';
         copyButton.textContent = 'Copy';
@@ -402,11 +725,91 @@ function addMessage(type, content) {
         messageContent.appendChild(copyButton);
     }
     
+    // Add screenshot previews if images are provided
+    if (images && images.length > 0) {
+        const imagesContainer = document.createElement('div');
+        imagesContainer.className = 'images-container';
+        imagesContainer.style.cssText = `
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        `;
+        
+        images.forEach((imageData, index) => {
+            const imageWrapper = document.createElement('div');
+            imageWrapper.className = 'image-wrapper';
+            imageWrapper.style.cssText = `
+                position: relative;
+                display: inline-block;
+            `;
+            imageWrapper.dataset.imageIndex = index; // Store the original index
+            
+            const imagePreview = document.createElement('img');
+            imagePreview.src = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+            imagePreview.style.cssText = `
+                max-width: 150px;
+                max-height: 100px;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                cursor: pointer;
+                transition: transform 0.2s;
+            `;
+            imagePreview.title = 'Click to view full size';
+            
+            // Add hover effect
+            imagePreview.onmouseover = () => imagePreview.style.transform = 'scale(1.05)';
+            imagePreview.onmouseout = () => imagePreview.style.transform = 'scale(1)';
+            
+            // Add click to view full size
+            imagePreview.onclick = () => {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    cursor: pointer;
+                `;
+                
+                const fullImage = document.createElement('img');
+                fullImage.src = imagePreview.src;
+                fullImage.style.cssText = `
+                    max-width: 90%;
+                    max-height: 90%;
+                    border-radius: 8px;
+                `;
+                
+                modal.appendChild(fullImage);
+                modal.onclick = () => document.body.removeChild(modal);
+                document.body.appendChild(modal);
+            };
+            
+            imageWrapper.appendChild(imagePreview);
+            
+            // The 'x' button logic has been removed from here.
+            // Removal is now handled in the image manager modal.
+            
+            imagesContainer.appendChild(imageWrapper);
+        });
+        
+        messageContent.appendChild(imagesContainer);
+    }
+    
     // Format content
     if (type === 'error') {
-        messageContent.innerHTML = `<p style="color: #dc3545;">${escapeHtml(content)}</p>`;
+        messageContent.innerHTML += `<p style="color: #dc3545;">${escapeHtml(content)}</p>`;
     } else {
-        messageContent.innerHTML = formatMessageContent(content);
+        messageContent.innerHTML += formatMessageContent(content);
     }
     
     messageDiv.appendChild(messageContent);
@@ -414,6 +817,109 @@ function addMessage(type, content) {
     
     // Scroll to bottom
     elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    
+    return messageDiv; // Return the message div for potential removal
+}
+
+// Show a modal for managing and removing images
+function showImageManagerModal(draftMessageDiv) {
+    // Modal container
+    const modal = document.createElement('div');
+    modal.id = 'imageManagerModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 20000;
+    `;
+
+    // Modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+    `;
+
+    // Title
+    const title = document.createElement('h3');
+    title.textContent = 'Manage Images';
+    title.style.marginTop = '0';
+    modalContent.appendChild(title);
+
+    // Image grid
+    const imageGrid = document.createElement('div');
+    imageGrid.style.cssText = `
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 15px;
+    `;
+    modalContent.appendChild(imageGrid);
+    
+    // Get current images from the draft message
+    const imageElements = draftMessageDiv.querySelectorAll('.images-container .image-wrapper');
+    
+    imageElements.forEach(wrapper => {
+        const itemContainer = document.createElement('div');
+        itemContainer.style.textAlign = 'center';
+
+        const img = wrapper.querySelector('img').cloneNode(true);
+        img.style.maxWidth = '200px';
+        img.style.maxHeight = '150px';
+        itemContainer.appendChild(img);
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.style.cssText = `
+            display: block;
+            margin: 8px auto 0;
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        `;
+        
+        removeBtn.onclick = () => {
+            // Remove from modal
+            itemContainer.remove();
+            // Remove the original from the draft message in the background
+            wrapper.remove();
+        };
+        
+        itemContainer.appendChild(removeBtn);
+        imageGrid.appendChild(itemContainer);
+    });
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Done';
+    closeBtn.style.cssText = `
+        display: block;
+        margin: 20px auto 0;
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    closeBtn.onclick = () => document.body.removeChild(modal);
+    modalContent.appendChild(closeBtn);
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
 }
 
 // Format message content with markdown rendering
@@ -753,7 +1259,4 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// Initialize the sidebar
-document.addEventListener('DOMContentLoaded', () => {
-    init();
-}); 
+// Note: Sidebar initialization is already handled by the existing DOMContentLoaded listener above 

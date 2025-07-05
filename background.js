@@ -18,6 +18,29 @@ browser.runtime.onInstalled.addListener(() => {
     createContextMenus();
 });
 
+// Handle messages from content script and sidebar
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'contextMenuAction') {
+        // Forward context menu actions to sidebar
+        browser.runtime.sendMessage({
+            action: 'contextMenuAction',
+            menuItemId: message.menuItemId,
+            selectedText: message.selectedText
+        });
+    } else if (message.action === 'captureScreenshot') {
+        // Capture visible tab screenshot
+        browser.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
+            if (browser.runtime.lastError) {
+                console.error('Screenshot capture failed:', browser.runtime.lastError);
+                sendResponse({screenshot: null});
+            } else {
+                sendResponse({screenshot: dataUrl});
+            }
+        });
+        return true; // Keep message channel open for async response
+    }
+});
+
 // Create context menu items
 function createContextMenus() {
     // Remove existing context menu items
