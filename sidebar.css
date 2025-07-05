@@ -55,6 +55,72 @@ body {
     gap: 8px;
 }
 
+#editContextButton,
+.edit-context-button {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    margin-right: 8px !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+/* Temporary test - bright red background to verify CSS is loading */
+#editContextButton {
+    background: red !important;
+}
+
+#editContextButton:hover,
+.edit-context-button:hover {
+    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+}
+
+#editContextButton:active,
+.edit-context-button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3) !important;
+}
+
+#editContextButton svg,
+.edit-context-button svg {
+    flex-shrink: 0 !important;
+    transition: transform 0.2s ease !important;
+}
+
+#editContextButton:hover svg,
+.edit-context-button:hover svg {
+    transform: rotate(5deg) scale(1.05) !important;
+}
+
+#editContextButton::before,
+.edit-context-button::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent) !important;
+    transition: left 0.5s ease !important;
+}
+
+#editContextButton:hover::before,
+.edit-context-button:hover::before {
+    left: 100% !important;
+}
+
 .export-button {
     display: flex;
     align-items: center;
@@ -297,6 +363,57 @@ body {
 
 .message-content a:hover {
     text-decoration: underline;
+}
+
+/* Markdown table styles */
+.message-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 13px;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.message-content th,
+.message-content td {
+    border: 1px solid #e1e5e9;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.message-content th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.message-content tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.message-content tr:hover {
+    background: #e9ecef;
+}
+
+.message-content td {
+    color: #495057;
+}
+
+/* Responsive table */
+@media (max-width: 600px) {
+    .message-content table {
+        font-size: 11px;
+    }
+    
+    .message-content th,
+    .message-content td {
+        padding: 6px 8px;
+    }
 }
 
 /* Copy button */

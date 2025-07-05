@@ -85,11 +85,33 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - Added Select All/Clear All buttons for convenience
 - Visual feedback with green border/background for selected images
 
+## Latest Major Enhancement: Multi-Tab Context Selection
+- **Status**: COMPLETED - Multi-tab context selection implemented
+- **Feature**: Users can now select multiple tabs to combine their contexts
+- **UI Flow**: 
+  1. Extension opens with current tab context (default)
+  2. User clicks "Edit Context" button in header
+  3. Modal shows all open tabs with checkboxes
+  4. User selects multiple tabs to combine contexts
+  5. Apply → Extension uses combined context from selected tabs
+- **Implementation**: 
+  - Added "Edit Context" button to sidebar header
+  - Tab discovery function filters valid web pages
+  - Modal UI with checkboxes for multi-selection
+  - Content extraction from multiple selected tabs
+  - Context management handles combined contexts
+  - UI updates to show selected tabs count
+- **Benefits**: 
+  - Compare information across multiple pages
+  - Analyze related content from different sources
+  - More comprehensive context for AI analysis
+  - Better insights from combined data sources
+
 ## Next Required Steps
-1. **TEST**: User tests enhanced trading analysis functionality
-2. **VERIFY**: Console logs show "ENHANCED TRADING ANALYSIS" when images sent
-3. **VALIDATE**: AI responses include commentary, technical analysis, outlook, and recommendations
-4. **CONFIRM**: Responses are informative but still focused on image-only analysis
+1. **TEST**: User tests multi-tab context selection functionality
+2. **VERIFY**: Edit Context button opens modal with all valid tabs
+3. **VALIDATE**: Multiple tab selection works and combines contexts properly
+4. **CONFIRM**: AI receives combined context from selected tabs
 
 ## Architecture Changes
 - **FROM**: Simple popup with one-time summarization

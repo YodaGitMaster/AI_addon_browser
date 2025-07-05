@@ -5,6 +5,7 @@
     "description": "Summarize web pages using Ollama Gemma3 model",
     "permissions": [
         "activeTab",
+        "tabs",
         "storage",
         "contextMenus"
     ],

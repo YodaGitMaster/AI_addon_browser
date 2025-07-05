@@ -2,6 +2,19 @@
 
 ## Key Discoveries
 
+### 2024-12-19 Multi-Tab Context Selection Implementation
+- **Feature**: Implemented comprehensive multi-tab context selection system
+- **Architecture**: Tab discovery → Modal UI → Content extraction → Context management
+- **UI Design**: Professional modal with checkboxes, visual feedback, and intuitive controls
+- **Tab Discovery**: Filters valid web pages, excludes extension and about: URLs
+- **Content Extraction**: Handles content script injection for inactive tabs
+- **Context Management**: Combines multiple tab contexts into unified prompt
+- **Error Handling**: Graceful degradation when tabs can't be accessed
+- **User Experience**: Pre-selects current tab, shows loading states, clear feedback
+- **Permissions**: Required "tabs" permission in manifest for cross-tab access
+- **Benefits**: Enables comparison and analysis across multiple pages simultaneously
+- **Key Learning**: Multi-tab functionality requires careful state management and error handling
+
 ### 2024-12-19 Enhanced Trading Analysis Implementation
 - **Evolution**: Improved trading prompt from dry recommendations to engaging analysis
 - **Structure**: 4-part analysis format (Chart Commentary → Technical Analysis → Market Outlook → Recommendation)

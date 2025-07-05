@@ -34,6 +34,7 @@ const elements = {
     chatMessages: document.getElementById('chatMessages'),
     messageInput: document.getElementById('messageInput'),
     sendButton: document.getElementById('sendButton'),
+    editContextButton: document.getElementById('editContextButton'),
     exportButton: document.getElementById('exportButton'),
     suggestionBtns: document.querySelectorAll('.suggestion-btn')
 };
@@ -195,6 +196,9 @@ async function loadPageContext() {
 function setupEventListeners() {
     // Send button
     elements.sendButton.addEventListener('click', handleSendMessage);
+    
+    // Edit context button
+    elements.editContextButton.addEventListener('click', handleEditContext);
     
     // Export button
     elements.exportButton.addEventListener('click', handleExportChat);
@@ -1139,13 +1143,16 @@ function formatMessageContent(content) {
     return html;
 }
 
-// Simple markdown renderer
+// Enhanced markdown renderer with table support
 function renderMarkdown(text) {
     // Convert code blocks first (to avoid conflicts with other patterns)
     text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     
     // Convert inline code
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Convert markdown tables
+    text = convertMarkdownTables(text);
     
     // Convert headers
     text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
@@ -1175,6 +1182,106 @@ function renderMarkdown(text) {
     text = text.replace(/\n/g, '<br>');
     
     return text;
+}
+
+// Convert markdown tables to HTML
+function convertMarkdownTables(text) {
+    // Split text into lines
+    const lines = text.split('\n');
+    let result = [];
+    let i = 0;
+    
+    while (i < lines.length) {
+        const line = lines[i].trim();
+        
+        // Check if this line looks like a table header (contains |)
+        if (line.includes('|') && line.split('|').length > 2) {
+            // Look for separator line (next line should contain dashes and pipes)
+            if (i + 1 < lines.length) {
+                const nextLine = lines[i + 1].trim();
+                if (nextLine.includes('|') && nextLine.includes('-')) {
+                    // This is a markdown table
+                    const tableResult = parseMarkdownTable(lines, i);
+                    result.push(tableResult.html);
+                    i = tableResult.nextIndex;
+                    continue;
+                }
+            }
+        }
+        
+        result.push(lines[i]);
+        i++;
+    }
+    
+    return result.join('\n');
+}
+
+// Parse a markdown table starting at the given index
+function parseMarkdownTable(lines, startIndex) {
+    let i = startIndex;
+    const tableLines = [];
+    
+    // Collect all table lines
+    while (i < lines.length) {
+        const line = lines[i].trim();
+        if (line.includes('|')) {
+            tableLines.push(line);
+            i++;
+        } else {
+            break;
+        }
+    }
+    
+    if (tableLines.length < 2) {
+        return { html: lines[startIndex], nextIndex: startIndex + 1 };
+    }
+    
+    // Parse header
+    const headerCells = tableLines[0].split('|').map(cell => cell.trim()).filter(cell => cell);
+    
+    // Skip separator line (index 1)
+    
+    // Parse data rows
+    const dataRows = [];
+    for (let j = 2; j < tableLines.length; j++) {
+        const cells = tableLines[j].split('|').map(cell => cell.trim()).filter(cell => cell);
+        if (cells.length > 0) {
+            dataRows.push(cells);
+        }
+    }
+    
+    // Generate HTML table
+    let html = '<table>';
+    
+    // Header
+    if (headerCells.length > 0) {
+        html += '<thead><tr>';
+        headerCells.forEach(cell => {
+            html += `<th>${cell}</th>`;
+        });
+        html += '</tr></thead>';
+    }
+    
+    // Body
+    if (dataRows.length > 0) {
+        html += '<tbody>';
+        dataRows.forEach(row => {
+            html += '<tr>';
+            row.forEach((cell, index) => {
+                html += `<td>${cell || ''}</td>`;
+            });
+            // Fill empty cells if row is shorter than header
+            for (let k = row.length; k < headerCells.length; k++) {
+                html += '<td></td>';
+            }
+            html += '</tr>';
+        });
+        html += '</tbody>';
+    }
+    
+    html += '</table>';
+    
+    return { html, nextIndex: i };
 }
 
 // Escape HTML
@@ -1241,6 +1348,367 @@ async function saveChatHistory() {
         });
     } catch (error) {
         console.error('Error saving chat history:', error);
+    }
+}
+
+// Handle edit context
+async function handleEditContext() {
+    try {
+        // Get all valid browser tabs
+        const allTabs = await browser.tabs.query({});
+        const webTabs = allTabs.filter(tab => 
+            tab.url.startsWith('http') && 
+            !tab.url.includes('extension://') &&
+            !tab.url.startsWith('about:')
+        );
+        
+        if (webTabs.length === 0) {
+            addMessage('error', 'No valid web pages found to select from.');
+            return;
+        }
+        
+        // Show tab selection modal
+        showTabSelectionModal(webTabs);
+        
+    } catch (error) {
+        console.error('Error getting tabs:', error);
+        addMessage('error', 'Could not access browser tabs.');
+    }
+}
+
+// Show tab selection modal
+function showTabSelectionModal(tabs) {
+    // Modal container
+    const modal = document.createElement('div');
+    modal.id = 'tabSelectionModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 20000;
+    `;
+
+    // Modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        min-width: 500px;
+    `;
+
+    // Title
+    const title = document.createElement('h3');
+    title.textContent = 'Select Tabs for Context';
+    title.style.marginTop = '0';
+    modalContent.appendChild(title);
+
+    // Instructions
+    const instructions = document.createElement('p');
+    instructions.textContent = 'Check the tabs you want to include in your AI context:';
+    instructions.style.cssText = `
+        margin-bottom: 15px;
+        color: #666;
+        font-size: 14px;
+    `;
+    modalContent.appendChild(instructions);
+
+    // Tab list container
+    const tabList = document.createElement('div');
+    tabList.style.cssText = `
+        margin-top: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+    `;
+    modalContent.appendChild(tabList);
+    
+    // Get current page URL to pre-select it
+    const currentUrl = currentPageContext?.url || '';
+    
+    tabs.forEach((tab, index) => {
+        const tabItem = document.createElement('div');
+        tabItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        `;
+        
+        // Checkbox
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `tab-${index}`;
+        checkbox.dataset.tabId = tab.id;
+        checkbox.style.cssText = `
+            margin-right: 12px;
+            transform: scale(1.2);
+        `;
+        
+        // Pre-select current tab
+        if (tab.url === currentUrl) {
+            checkbox.checked = true;
+            tabItem.style.backgroundColor = '#f8fff9';
+            tabItem.style.borderColor = '#28a745';
+        }
+        
+        // Tab info container
+        const tabInfo = document.createElement('div');
+        tabInfo.style.cssText = `
+            flex: 1;
+            min-width: 0;
+        `;
+        
+        // Tab title
+        const tabTitle = document.createElement('div');
+        tabTitle.textContent = tab.title || 'Untitled';
+        tabTitle.style.cssText = `
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        `;
+        
+        // Tab URL
+        const tabUrl = document.createElement('div');
+        tabUrl.textContent = tab.url;
+        tabUrl.style.cssText = `
+            font-size: 12px;
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        `;
+        
+        // Current tab indicator
+        if (tab.url === currentUrl) {
+            const currentLabel = document.createElement('span');
+            currentLabel.textContent = ' (Current)';
+            currentLabel.style.cssText = `
+                color: #28a745;
+                font-weight: 600;
+                font-size: 12px;
+            `;
+            tabTitle.appendChild(currentLabel);
+        }
+        
+        tabInfo.appendChild(tabTitle);
+        tabInfo.appendChild(tabUrl);
+        
+        // Click handler for the entire item
+        const updateSelection = () => {
+            if (checkbox.checked) {
+                tabItem.style.backgroundColor = '#f8fff9';
+                tabItem.style.borderColor = '#28a745';
+            } else {
+                tabItem.style.backgroundColor = 'white';
+                tabItem.style.borderColor = '#ddd';
+            }
+        };
+        
+        tabItem.onclick = () => {
+            checkbox.checked = !checkbox.checked;
+            updateSelection();
+        };
+        
+        checkbox.onchange = updateSelection;
+        
+        tabItem.appendChild(checkbox);
+        tabItem.appendChild(tabInfo);
+        tabList.appendChild(tabItem);
+    });
+
+    // Button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    `;
+
+    // Cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = `
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    cancelBtn.onclick = () => document.body.removeChild(modal);
+
+    // Apply button
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Apply Selected Tabs';
+    applyBtn.style.cssText = `
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    
+    applyBtn.onclick = async () => {
+        // Get selected tabs
+        const selectedCheckboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+        const selectedTabIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.dataset.tabId));
+        
+        if (selectedTabIds.length === 0) {
+            alert('Please select at least one tab.');
+            return;
+        }
+        
+        // Show loading
+        applyBtn.textContent = 'Loading...';
+        applyBtn.disabled = true;
+        
+        try {
+            // Extract content from selected tabs
+            await loadMultiTabContext(selectedTabIds);
+            document.body.removeChild(modal);
+        } catch (error) {
+            console.error('Error loading multi-tab context:', error);
+            addMessage('error', 'Failed to load content from selected tabs.');
+            applyBtn.textContent = 'Apply Selected Tabs';
+            applyBtn.disabled = false;
+        }
+    };
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(applyBtn);
+    modalContent.appendChild(buttonContainer);
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+}
+
+// Load context from multiple tabs
+async function loadMultiTabContext(tabIds) {
+    try {
+        const tabContexts = [];
+        
+        for (const tabId of tabIds) {
+            try {
+                // First try to get tab info
+                const tab = await browser.tabs.get(tabId);
+                
+                // Try to extract content from the tab
+                const contentResponse = await browser.tabs.sendMessage(tabId, { 
+                    action: 'extractContent', 
+                    includeScreenshots: false 
+                });
+                
+                if (contentResponse && contentResponse.success) {
+                    tabContexts.push({
+                        tabId: tabId,
+                        title: contentResponse.data.title,
+                        url: contentResponse.data.url,
+                        content: contentResponse.data.textContent,
+                        tables: contentResponse.data.tables || [],
+                        charts: contentResponse.data.charts || []
+                    });
+                } else {
+                    // Content script might not be injected, try to inject it
+                    try {
+                        await browser.tabs.executeScript(tabId, {
+                            file: 'content-script.js'
+                        });
+                        
+                        // Wait a bit for script to load
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Try again
+                        const retryResponse = await browser.tabs.sendMessage(tabId, { 
+                            action: 'extractContent', 
+                            includeScreenshots: false 
+                        });
+                        
+                        if (retryResponse && retryResponse.success) {
+                            tabContexts.push({
+                                tabId: tabId,
+                                title: retryResponse.data.title,
+                                url: retryResponse.data.url,
+                                content: retryResponse.data.textContent,
+                                tables: retryResponse.data.tables || [],
+                                charts: retryResponse.data.charts || []
+                            });
+                        } else {
+                            console.warn(`Could not extract content from tab ${tabId}: ${tab.title}`);
+                        }
+                    } catch (injectionError) {
+                        console.warn(`Could not inject content script into tab ${tabId}: ${tab.title}`);
+                    }
+                }
+            } catch (tabError) {
+                console.warn(`Error accessing tab ${tabId}:`, tabError);
+            }
+        }
+        
+        if (tabContexts.length === 0) {
+            throw new Error('No content could be extracted from selected tabs');
+        }
+        
+        // Update current page context with combined context
+        currentPageContext = {
+            title: tabContexts.length === 1 ? 
+                tabContexts[0].title : 
+                `${tabContexts.length} tabs selected`,
+            url: tabContexts.length === 1 ? 
+                tabContexts[0].url : 
+                `Multiple tabs (${tabContexts.length})`,
+            content: tabContexts.map(ctx => `--- ${ctx.title} ---\n${ctx.content}`).join('\n\n'),
+            tables: tabContexts.flatMap(ctx => ctx.tables),
+            charts: tabContexts.flatMap(ctx => ctx.charts),
+            multiTab: true,
+            tabContexts: tabContexts
+        };
+        
+        // Update UI
+        updateContextDisplay();
+        
+        console.log(`Multi-tab context loaded: ${tabContexts.length} tabs`);
+        
+    } catch (error) {
+        console.error('Error loading multi-tab context:', error);
+        throw error;
+    }
+}
+
+// Update context display in UI
+function updateContextDisplay() {
+    if (currentPageContext.multiTab) {
+        elements.pageTitle.textContent = currentPageContext.title;
+        elements.pageUrl.textContent = currentPageContext.url;
+        
+        // Show which tabs are selected
+        const tabList = currentPageContext.tabContexts
+            .map(ctx => `• ${ctx.title}`)
+            .join('\n');
+        
+        console.log('Selected tabs:\n' + tabList);
+    } else {
+        elements.pageTitle.textContent = currentPageContext.title;
+        elements.pageUrl.textContent = currentPageContext.url;
     }
 }
 
