@@ -17,6 +17,8 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - [x] Fix double message issue when clicking suggestion buttons
 - [x] Restore context menu functionality for right-click access
 - [x] Implement inverse image selection logic
+- [x] Rewrite README with detailed usage and hardware requirements
+- [x] Create in-depth technical documentation
 
 ## Latest Major Enhancement: Chart Analysis Enhancement
 - **Status**: COMPLETED - Enhanced trading analysis with values-first approach
@@ -112,6 +114,8 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 2. **VERIFY**: Edit Context button opens modal with all valid tabs
 3. **VALIDATE**: Multiple tab selection works and combines contexts properly
 4. **CONFIRM**: AI receives combined context from selected tabs
+5. **VERIFY**: Markdown table rendering is correct in AI responses
+6. **VERIFY**: Single asterisks are no longer rendered as italics in markdown
 
 ## Architecture Changes
 - **FROM**: Simple popup with one-time summarization
@@ -156,13 +160,15 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 
 ## Key Files Created/Updated ✅
 - manifest.json (updated for sidebar)
-- sidebar.html (new chat interface)
-- sidebar.css (modern chat styling)
-- sidebar.js (comprehensive chat functionality)
+- sidebar.html (new chat interface, new quick action buttons)
+- sidebar.css (modern chat styling, new button styles, table styles)
+- sidebar.js (comprehensive chat functionality, multi-tab, image management, markdown table parser, italic removal)
 - content-script.js (unchanged - still extracts content)
 - icons/icon.svg (unchanged)
 - generate-icons.html (unchanged)
-- README.md (needs updating for new features)
+- README.md (rewritten with full usage instructions and hardware requirements)
+- RELOAD_EXTENSION.md (unchanged)
+- context/technical-docs.md (NEW - in-depth technical documentation)
 
 ## Removed Files ✅
 - popup.html (replaced by sidebar.html)

@@ -36,7 +36,9 @@
 
 ### 2024-12-19 Markdown Visualization & Export Feature
 - **Feature**: Added comprehensive markdown rendering and export functionality
-- **Rendering**: AI responses now display with proper formatting (headers, code blocks, lists, links, etc.)
+- **Rendering**: AI responses now display with proper formatting (headers, code blocks, lists, links, tables)
+- **Table Support**: Implemented robust markdown table parsing and beautiful CSS styling for tables.
+- **Italic Formatting**: Modified markdown renderer to remove single asterisks, effectively disabling italic formatting from `*text*`.
 - **Export**: Users can export entire chat conversations as markdown files
 - **Options**: Copy to clipboard or download as timestamped .md file
 - **Modal**: Professional export interface with preview
@@ -121,6 +123,7 @@
 - **Context Prompts**: Including page content and conversation history is game-changing
 - **Visual Feedback**: Typing indicators and smooth animations enhance perceived performance
 - **Conversation History**: Storing chat sessions enables future features and debugging
+- **Markdown Rendering**: Enhanced to support tables and control italic formatting.
 
 ## Technical Notes
 - Manifest V3 uses service workers instead of persistent background pages ✅
@@ -136,6 +139,7 @@
 - **Sidebar Architecture**: sidebar_action in manifest.json enables persistent sidebar interface
 - **Chat Interface**: Modern CSS animations and smooth scrolling crucial for good UX
 - **Context Management**: Balancing context size vs. prompt length is important for performance
+- **Markdown Parsing**: Updated to include table rendering and ignore single asterisks for italics.
 
 ## Development Success Factors
 1. **Modular Architecture**: Clean separation of concerns
@@ -188,6 +192,7 @@
 - **CORS Configuration**: Server-side configuration is often the right solution for extension API calls
 - **Extension Window Context**: Standalone windows are isolated from browser windows - tab queries need cross-window logic
 - **Robust Tab Filtering**: Always filter out extension URLs when looking for web page content
+- **Markdown Rendering**: Important to precisely control how markdown is parsed and rendered, especially for common characters like asterisks.
 
 ## Performance Insights
 - Content extraction is fast (<100ms)

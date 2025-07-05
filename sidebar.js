@@ -1162,8 +1162,8 @@ function renderMarkdown(text) {
     // Convert bold text
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
-    // Convert italic text
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Convert italic text - removing single asterisks
+    text = text.replace(/\*(.*?)\*/g, '$1');
     
     // Convert links
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
