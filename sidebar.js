@@ -711,6 +711,35 @@ async function createContextPrompt(userMessage) {
     
     // Extract all chart screenshots into an array
     const images = [];
+    const imageHashes = new Set(); // Track image hashes to prevent duplicates
+    
+    // Helper function to create a simple hash from image data
+    function simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString();
+    }
+    
+    // Helper function to add image with deduplication
+    function addUniqueImage(imageData, source) {
+        if (!imageData) return;
+        
+        // Create hash from first 1000 characters of base64 data for performance
+        const hashData = imageData.substring(0, 1000);
+        const hash = simpleHash(hashData);
+        
+        if (!imageHashes.has(hash)) {
+            imageHashes.add(hash);
+            images.push(imageData);
+            console.log(`Added unique image from ${source}, hash: ${hash}`);
+        } else {
+            console.log(`Skipped duplicate image from ${source}, hash: ${hash}`);
+        }
+    }
     
     // Always check for charts and images if they exist on the page
     if (currentPageContext && (currentPageContext.charts?.length > 0 || currentPageContext.images?.length > 0)) {
@@ -761,10 +790,12 @@ async function createContextPrompt(userMessage) {
                     // Handle both full page screenshots and canvas screenshots
                     if (chart.type === 'fullpage') {
                         // Full page screenshots already have the data: prefix
-                        images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                        const imageData = chart.screenshot.split(',')[1]; // Extract base64 part
+                        addUniqueImage(imageData, `chart-${chart.id}-fullpage`);
                     } else if (chart.type === 'canvas') {
                         // Canvas screenshots have the data: prefix
-                        images.push(chart.screenshot.split(',')[1]); // Extract base64 part
+                        const imageData = chart.screenshot.split(',')[1]; // Extract base64 part
+                        addUniqueImage(imageData, `chart-${chart.id}-canvas`);
                     }
                 }
             });
@@ -779,7 +810,8 @@ async function createContextPrompt(userMessage) {
                 });
                 if (image.screenshot) {
                     // Content images have the data: prefix
-                    images.push(image.screenshot.split(',')[1]); // Extract base64 part
+                    const imageData = image.screenshot.split(',')[1]; // Extract base64 part
+                    addUniqueImage(imageData, `image-${image.id}-${image.type}`);
                 }
             });
         }
