@@ -78,6 +78,17 @@
 - User control over model selection
 - Works with CORS configuration
 
+### Model Settings Management
+**Decision**: Implement settings menu with model selection and persistence
+**Rationale**:
+- User control over AI model selection (gemma3:4b vs gemma3n:e4b)
+- Persistent settings across browser sessions
+- Real-time model availability checking from Ollama server
+- Professional settings interface with modal design
+- Browser storage for reliable settings persistence
+- Automatic status update when model changes
+- Clear visual feedback for available vs unavailable models
+
 ### Text Extraction Strategy
 **Decision**: Extract textContent from main content areas, skip nav/footer
 **Rationale**:
@@ -122,9 +133,11 @@
 - **External API**: Privacy and cost concerns
 
 ## Configuration Choices
-- Default Ollama model: gemma3:latest
+- Default Ollama model: gemma3:4b (user-configurable via settings)
 - Max content length: 3000 chars in context (prevent huge requests)
 - Sidebar chat interface with persistent context
 - Auto-scroll and typing indicators for better UX
 - Copy functionality for all messages
-- Context window: Last 3 conversation exchanges + full page content 
+- Context window: Last 3 conversation exchanges + full page content
+- Settings persistence: Browser storage for model preferences
+- Available models: gemma3:4b (default), gemma3n:e4b (new) 

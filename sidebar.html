@@ -18,6 +18,15 @@
                     <span class="status-text" id="statusText">Connecting...</span>
                 </div>
                 <div class="header-actions">
+                    <button id="settingsButton" class="settings-button" title="Settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
+                    </button>
                     <button id="editContextButton" class="edit-context-button" title="Select tabs for context">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -106,7 +115,8 @@
                     data-message="Please analyze any charts, graphs, or visual data on this page">📈 Analyze
                     Charts</button>
                 <button class="suggestion-btn"
-                    data-message="Analyze the images on this page and provide: 1) Short description of what each image shows, 2) Key visual elements, colors, and composition, 3) Any text or data visible in the images, 4) Context and relevance to the page content, 5) Notable details or insights">🖼️ Analyze
+                    data-message="Analyze the images on this page and provide: 1) Short description of what each image shows, 2) Key visual elements, colors, and composition, 3) Any text or data visible in the images, 4) Context and relevance to the page content, 5) Notable details or insights">🖼️
+                    Analyze
                     Images</button>
                 <button class="suggestion-btn"
                     data-message="What insights can you extract from the data on this page? Present any data in markdown table format with | separators.">📊
@@ -130,6 +140,44 @@
                     Extract Tables</button>
                 <button class="suggestion-btn"
                     data-message="Generate study questions and flashcards for this content">🎓 Study Questions</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button id="closeSettingsButton" class="close-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label for="modelSelect">AI Model:</label>
+                    <select id="modelSelect" class="model-select">
+                        <option value="gemma3:4b">Gemma3 4B (Default)</option>
+                        <option value="gemma3n:e4b">Gemma3N E4B (New)</option>
+                    </select>
+                    <div class="setting-description">
+                        Choose the AI model to use for analysis. Different models may have different capabilities and
+                        performance characteristics.
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>Available Models:</label>
+                    <div id="availableModels" class="available-models">
+                        <div class="loading-models">Loading available models...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveSettingsButton" class="save-button">Save Settings</button>
+                <button id="cancelSettingsButton" class="cancel-button">Cancel</button>
             </div>
         </div>
     </div>

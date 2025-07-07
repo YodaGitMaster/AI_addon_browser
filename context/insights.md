@@ -4,6 +4,22 @@
 
 ## Key Discoveries
 
+### 2024-01-XX Model Settings Menu Implementation
+- **Feature**: Implemented comprehensive settings menu with interactive model selection
+- **Architecture**: Settings button → Modal UI → Clickable model list → Browser storage → Status update
+- **UI Design**: Professional modal with clickable model items, visual feedback, and intuitive controls
+- **Model Discovery**: Real-time checking of available models from Ollama server
+- **Storage System**: Browser storage for persistent settings across sessions
+- **Status Integration**: Automatic status update when model changes
+- **Model List**: Displays available models with sizes, availability status, and click-to-select functionality
+- **Interactive Selection**: Users can click any available model to select it with immediate visual feedback
+- **Visual Feedback**: Selected model highlighted with blue background, checkmark, and "Selected" status
+- **Error Handling**: Graceful degradation when Ollama server unavailable
+- **User Experience**: Clear visual feedback, loading states, confirmation messages, and smooth animations
+- **Permissions**: Uses existing "storage" permission for settings persistence
+- **Benefits**: User control over AI model, persistent preferences, easy model switching, intuitive interface
+- **Key Learning**: Interactive UI elements with immediate feedback significantly improve user experience
+
 ### 2024-12-19 Multi-Tab Context Selection Implementation
 - **Feature**: Implemented comprehensive multi-tab context selection system
 - **Architecture**: Tab discovery → Modal UI → Content extraction → Context management

@@ -3,7 +3,25 @@
 **Last Updated:** 2024-07-25
 
 ## Current Task
-Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UPGRADE COMPLETED
+Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - SETTINGS MENU ADDED ✅
+
+## Active Tasks - COMPLETED ✅
+- [x] Create Firefox addon manifest
+- [x] Implement page content extraction
+- [x] Setup Ollama API communication
+- [x] Create sidebar chat interface
+- [x] Add copy functionality for messages
+- [x] Implement persistent page context
+- [x] Add conversation history management
+- [x] Create comprehensive documentation
+- [x] Create icon generation system
+- [x] Fix 403 Forbidden CORS error
+- [x] Fix double message issue when clicking suggestion buttons
+- [x] Restore context menu functionality for right-click access
+- [x] Implement inverse image selection logic
+- [x] Rewrite README with detailed usage and hardware requirements
+- [x] Create in-depth technical documentation
+- [x] Add model settings menu with model selection
 
 ## Active Tasks - COMPLETED ✅
 - [x] Create Firefox addon manifest
@@ -22,7 +40,34 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 - [x] Rewrite README with detailed usage and hardware requirements
 - [x] Create in-depth technical documentation
 
-## Latest Major Enhancement: Chart Analysis Enhancement
+## Latest Major Enhancement: Model Settings Menu
+- **Status**: COMPLETED - Settings menu with model selection implemented
+- **Feature**: Users can now select and save their preferred AI model
+- **UI Flow**: 
+  1. User clicks settings gear icon in header
+  2. Modal opens with model selection dropdown
+  3. Shows available models from Ollama server
+  4. User clicks any available model to select it
+  5. User saves settings to apply the model
+  6. Extension uses selected model for all future requests
+- **Available Models**: 
+  - gemma3:4b (Default)
+  - gemma3n:e4b (New)
+- **Implementation**: 
+  - Added settings button to sidebar header
+  - Modal interface with clickable model list
+  - Browser storage for persistent settings
+  - Real-time model availability checking
+  - Automatic status update when model changes
+  - Interactive model selection with visual feedback
+- **Benefits**: 
+  - User control over AI model selection
+  - Persistent settings across sessions
+  - Real-time model availability display
+  - Easy switching between different models
+  - Intuitive click-to-select interface
+
+## Previous Enhancement: Chart Analysis Enhancement
 - **Status**: COMPLETED - Enhanced trading analysis with values-first approach
 - **Change**: Chart analysis now always starts with data values description
 - **NEW Structure**: 
@@ -77,7 +122,19 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
   - Graceful degradation when semantic elements missing
 
 ## Last Completed Action
-- Modified `content-script.js` to handle list-based pages, specifically for `idealista.it`.
+- **Settings Menu Implementation** (2024-01-XX): Added comprehensive settings functionality
+  - Added settings gear icon to sidebar header
+  - Created modal interface with model selection dropdown
+  - Implemented browser storage for persistent settings
+  - Added real-time model availability checking from Ollama server
+  - Created model list display showing available models with sizes
+  - Added automatic status update when model changes
+  - Implemented save/cancel functionality with proper event handling
+  - Added CSS styling for settings modal and buttons
+  - Updated sidebar.js with settings management functions
+  - Added loadSettings() and saveSettings() functions
+  - Integrated settings loading into initialization process
+- **Previous**: Modified `content-script.js` to handle list-based pages, specifically for `idealista.it`.
 - The script now detects if it's on a list page, iterates through all property items, and extracts key details into a formatted summary.
 - The generic content extractor is preserved as a fallback for non-list pages.
 - **NEW**: Implemented comprehensive image detection and capture system similar to chart detection.
@@ -178,9 +235,9 @@ Firefox sidebar extension for AI-powered page chat with Ollama Gemma3 - MAJOR UP
 
 ## Key Files Created/Updated ✅
 - manifest.json (updated for sidebar)
-- sidebar.html (new chat interface, new quick action buttons)
-- sidebar.css (modern chat styling, new button styles, table styles)
-- sidebar.js (comprehensive chat functionality, multi-tab, image management, markdown table parser, italic removal)
+- sidebar.html (new chat interface, new quick action buttons, settings modal)
+- sidebar.css (modern chat styling, new button styles, table styles, settings modal styles)
+- sidebar.js (comprehensive chat functionality, multi-tab, image management, markdown table parser, italic removal, settings management)
 - content-script.js (updated to handle list-based pages)
 - icons/icon.svg (unchanged)
 - generate-icons.html (unchanged)

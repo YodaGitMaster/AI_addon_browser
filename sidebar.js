@@ -42,7 +42,15 @@ const elements = {
     sendButton: document.getElementById('sendButton'),
     editContextButton: document.getElementById('editContextButton'),
     exportButton: document.getElementById('exportButton'),
-    suggestionBtns: document.querySelectorAll('.suggestion-btn')
+    suggestionBtns: document.querySelectorAll('.suggestion-btn'),
+    // Settings elements
+    settingsButton: document.getElementById('settingsButton'),
+    settingsModal: document.getElementById('settingsModal'),
+    modelSelect: document.getElementById('modelSelect'),
+    availableModels: document.getElementById('availableModels'),
+    closeSettingsButton: document.getElementById('closeSettingsButton'),
+    saveSettingsButton: document.getElementById('saveSettingsButton'),
+    cancelSettingsButton: document.getElementById('cancelSettingsButton')
 };
 
 // Initialize sidebar
@@ -51,6 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Initialize clean state
     clearPendingState();
+    
+    // Load settings
+    await loadSettings();
     
     // Check Ollama status
     await checkOllamaStatus();
@@ -111,6 +122,146 @@ async function checkOllamaStatus() {
 function updateStatus(status, text) {
     elements.statusDot.className = `status-dot ${status}`;
     elements.statusText.textContent = text;
+}
+
+// Settings functions
+async function loadSettings() {
+    try {
+        const result = await browser.storage.local.get(['selectedModel']);
+        if (result.selectedModel) {
+            OLLAMA_CONFIG.model = result.selectedModel;
+            console.log('Loaded saved model setting:', OLLAMA_CONFIG.model);
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+async function saveSettings() {
+    try {
+        await browser.storage.local.set({
+            selectedModel: OLLAMA_CONFIG.model
+        });
+        console.log('Settings saved:', OLLAMA_CONFIG.model);
+    } catch (error) {
+        console.error('Error saving settings:', error);
+    }
+}
+
+function showSettingsModal() {
+    elements.settingsModal.style.display = 'block';
+    elements.modelSelect.value = OLLAMA_CONFIG.model;
+    loadAvailableModels();
+}
+
+function hideSettingsModal() {
+    elements.settingsModal.style.display = 'none';
+}
+
+async function loadAvailableModels() {
+    try {
+        elements.availableModels.innerHTML = '<div class="loading-models">Loading available models...</div>';
+        
+        const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/tags`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const models = data.models || [];
+            
+            if (models.length === 0) {
+                elements.availableModels.innerHTML = '<div class="loading-models">No models found. Please install models using: ollama pull gemma3:4b</div>';
+                return;
+            }
+            
+            const modelsHtml = models.map(model => {
+                const isSelected = model.name === OLLAMA_CONFIG.model;
+                const status = isSelected ? 'available' : 'unavailable';
+                const statusText = isSelected ? 'Current' : 'Available';
+                const selectedClass = isSelected ? 'selected-model' : '';
+                
+                return `
+                    <div class="model-item clickable-model ${selectedClass}" data-model="${model.name}">
+                        <div>
+                            <div class="model-name">
+                                ${model.name}
+                                ${isSelected ? '<span class="model-checkmark">✓</span>' : ''}
+                            </div>
+                            <div class="model-size">${formatModelSize(model.size)}</div>
+                        </div>
+                        <span class="model-status ${status}">${statusText}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            elements.availableModels.innerHTML = modelsHtml;
+            
+            // Add click event listeners to model items
+            const modelItems = elements.availableModels.querySelectorAll('.clickable-model');
+            modelItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const modelName = item.dataset.model;
+                    elements.modelSelect.value = modelName;
+                    
+                    // Update visual feedback
+                    modelItems.forEach(mi => {
+                        const statusSpan = mi.querySelector('.model-status');
+                        const modelNameDiv = mi.querySelector('.model-name');
+                        
+                        if (mi.dataset.model === modelName) {
+                            statusSpan.textContent = 'Selected';
+                            statusSpan.className = 'model-status available';
+                            mi.classList.add('selected-model');
+                            // Add checkmark if not present
+                            if (!modelNameDiv.querySelector('.model-checkmark')) {
+                                modelNameDiv.innerHTML += '<span class="model-checkmark">✓</span>';
+                            }
+                        } else {
+                            const originalModel = models.find(m => m.name === mi.dataset.model);
+                            statusSpan.textContent = originalModel ? 'Available' : 'Unavailable';
+                            statusSpan.className = 'model-status unavailable';
+                            mi.classList.remove('selected-model');
+                            // Remove checkmark
+                            const checkmark = modelNameDiv.querySelector('.model-checkmark');
+                            if (checkmark) {
+                                checkmark.remove();
+                            }
+                        }
+                    });
+                });
+            });
+        } else {
+            elements.availableModels.innerHTML = '<div class="loading-models">Error loading models. Please check Ollama connection.</div>';
+        }
+    } catch (error) {
+        console.error('Error loading available models:', error);
+        elements.availableModels.innerHTML = '<div class="loading-models">Error loading models. Please check Ollama connection.</div>';
+    }
+}
+
+function formatModelSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+async function handleSaveSettings() {
+    const newModel = elements.modelSelect.value;
+    if (newModel !== OLLAMA_CONFIG.model) {
+        OLLAMA_CONFIG.model = newModel;
+        await saveSettings();
+        
+        // Re-check Ollama status with new model
+        await checkOllamaStatus();
+        
+        addMessage('success', `Model changed to: ${newModel}`);
+    }
+    
+    hideSettingsModal();
 }
 
 // Load page context
@@ -212,6 +363,21 @@ function setupEventListeners() {
     
     // Export button
     elements.exportButton.addEventListener('click', handleExportChat);
+    
+    // Settings button
+    elements.settingsButton.addEventListener('click', showSettingsModal);
+    
+    // Settings modal events
+    elements.closeSettingsButton.addEventListener('click', hideSettingsModal);
+    elements.cancelSettingsButton.addEventListener('click', hideSettingsModal);
+    elements.saveSettingsButton.addEventListener('click', handleSaveSettings);
+    
+    // Close modal when clicking outside
+    elements.settingsModal.addEventListener('click', (e) => {
+        if (e.target === elements.settingsModal) {
+            hideSettingsModal();
+        }
+    });
     
     // Input handling
     elements.messageInput.addEventListener('input', handleInputChange);
